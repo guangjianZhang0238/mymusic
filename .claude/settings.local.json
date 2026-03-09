@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tasklist)",
+      "Bash(findstr /i \"gradle java\")",
+      "Bash(./gradlew --stop)",
+      "Bash(./gradlew clean)",
+      "Bash(findstr /i \"idea studio\")",
+      "Bash(powershell -Command \"Remove-Item -Path ''app\\\\build'' -Recurse -Force -ErrorAction SilentlyContinue\")"
+    ]
+  }
+}

@@ -1,0 +1,115 @@
+package com.music.app.controller;
+
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.music.app.service.AppMusicService;
+import com.music.app.vo.AppAlbumVO;
+import com.music.app.vo.AppArtistVO;
+import com.music.app.vo.AppSongVO;
+import com.music.app.vo.SearchSuggestionVO;
+import com.music.common.core.domain.Result;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@Tag(name = "App端音乐接口")
+
+@Tag(name = "App端音乐接口")
+@RestController
+@RequestMapping("/api/app/music")
+@RequiredArgsConstructor
+public class AppMusicController {
+
+    private static final Logger log = LoggerFactory.getLogger(AppMusicController.class);
+    
+    private final AppMusicService appMusicService;
+
+    @Operation(summary = "App端歌曲分页")
+    @GetMapping("/song/page")
+    public Result<Page<AppSongVO>> songPage(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long albumId,
+            @RequestParam(required = false) Long artistId
+    ) {
+        log.info("访问接口：开始查询歌曲分页，关键词: {}, 专辑ID: {}, 歌手ID: {}", keyword, albumId, artistId);
+        return Result.success(appMusicService.pageSongs(current, size, keyword, albumId, artistId));
+    }
+
+    @Operation(summary = "App端热门歌曲")
+    @GetMapping("/song/hot")
+    public Result<List<AppSongVO>> hotSongs() {
+        log.info("访问接口：开始查询热门歌曲");
+        return Result.success(appMusicService.hotSongs());
+    }
+
+    @Operation(summary = "App端专辑分页")
+    @GetMapping("/album/page")
+    public Result<Page<AppAlbumVO>> albumPage(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(required = false) String keyword
+    ) {
+        log.info("访问接口：开始查询专辑分页，关键词: {}", keyword);
+        return Result.success(appMusicService.pageAlbums(current, size, keyword));
+    }
+
+    @Operation(summary = "App端歌手分页")
+    @GetMapping("/artist/page")
+    public Result<Page<AppArtistVO>> artistPage(
+            @RequestParam(defaultValue = "1") Integer current,
+            @RequestParam(defaultValue = "20") Integer size,
+            @RequestParam(required = false) String keyword
+    ) {
+        log.info("访问接口：开始查询歌手分页，关键词: {}", keyword);
+        return Result.success(appMusicService.pageArtists(current, size, keyword));
+    }
+
+    @Operation(summary = "App端根据ID列表获取歌曲")
+    @GetMapping("/song/by-ids")
+    public Result<List<AppSongVO>> songsByIds(@RequestParam List<Long> ids) {
+        log.info("访问接口：开始根据ID列表获取歌曲，ID数量: {}", ids != null ? ids.size() : 0);
+        return Result.success(appMusicService.getSongsByIds(ids));
+    }
+
+    @Operation(summary = "App端专辑详情")
+    @GetMapping("/album/{albumId}")
+    public Result<AppAlbumVO> albumDetail(@PathVariable Long albumId) {
+        log.info("访问接口：开始查询专辑详情，专辑ID: {}", albumId);
+        return Result.success(appMusicService.getAlbumDetail(albumId));
+    }
+
+    @Operation(summary = "App端歌手详情")
+    @GetMapping("/artist/{artistId}")
+    public Result<AppArtistVO> artistDetail(@PathVariable Long artistId) {
+        log.info("访问接口：开始查询歌手详情，歌手ID: {}", artistId);
+        return Result.success(appMusicService.getArtistDetail(artistId));
+    }
+    
+    @Operation(summary = "App端歌手热门歌曲")
+    @GetMapping("/artist/{artistId}/top-songs")
+    public Result<List<AppSongVO>> artistTopSongs(
+            @PathVariable Long artistId,
+            @RequestParam(defaultValue = "20") int limit) {
+        log.info("访问接口：查询歌手热门歌曲，歌手 ID: {}, 数量: {}", artistId, limit);
+        return Result.success(appMusicService.getArtistTopSongs(artistId, limit));
+    }
+
+    @Operation(summary = "App端搜索联想")
+    @GetMapping("/search/suggestions")
+    public Result<List<SearchSuggestionVO>> getSuggestions(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "10") int limit) {
+        log.info("访问接口：开始获取搜索联想，关键字: {}, 限制数量: {}", keyword, limit);
+        return Result.success(appMusicService.getSuggestions(keyword, limit));
+    }
+}

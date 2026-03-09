@@ -1,0 +1,141 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  tomcat:
+    # 避免上传请求在连接层被提前中断（status=0 / EOF）
+    connection-timeout: 600000  # 10分钟
+    max-swallow-size: -1
+    max-http-form-post-size: -1
+    keep-alive-timeout: 600000  # 10分钟
+    accept-count: 100
+    max-connections: 8192
+
+spring:
+  application:
+    name: music-server
+  
+  # 字符编码配置
+  charset: UTF-8
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+      force-request: true
+      force-response: true
+  
+  datasource:
+    url: jdbc:mysql://localhost:3306/music_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true&connectionCharset=utf8mb4&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2
+    username: root
+    password: 43ae1ff64991
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      # 连接池基本配置
+      minimum-idle: 10
+      maximum-pool-size: 20
+      idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      # 连接测试配置
+      validation-timeout: 5000
+      leak-detection-threshold: 60000
+      # 连接属性
+      connection-test-query: SELECT 1
+      # 性能优化
+      pool-name: MusicHikariCP
+      auto-commit: true
+  
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    database: 0
+    password: Guangjian38+++
+    timeout: 5000
+    client-name: music-server
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 2
+        max-wait: 3000
+        time-between-eviction-runs: 60000
+      shutdown-timeout: 200
+  
+  servlet:
+    multipart:
+      max-file-size: 2GB
+      max-request-size: 2GB
+      # 指定上传临时目录，避免默认 temp 目录权限/空间问题导致 multipart 解析失败
+      location: ${music.storage.temp-path}
+      # 增加超时时间配置
+      file-size-threshold: 0
+      resolve-lazily: false
+    async:
+      request-timeout: 600000  # 10分钟
+
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.music.*.entity
+  global-config:
+    db-config:
+      id-type: AUTO
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+
+music:
+  storage:
+    base-path: C:\music_folders\music_source
+    temp-path: C:\music_folders\music_temp
+    # 单个文件最大上传大小（字节）。2GB
+    max-file-size: 2147483648
+  
+  transcoding:
+    ffmpeg:
+      path: C:\Users\zgj\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe
+    temp:
+      dir: C:\music_folders\music_transcoding_temp
+    delete-source: true
+    auto-transcode: true
+  
+  jwt:
+    secret: music-player-jwt-secret-key-must-be-at-least-256-bits
+    expiration: 7200000
+
+logging:
+  level:
+    root: info
+    com.music: debug
+    com.zaxxer.hikari: debug
+    org.springframework.jdbc: debug
+    org.mybatis: debug
+  # 日志编码配置
+  charset:
+    console: UTF-8
+    file: UTF-8
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/music-server.log
+    max-size: 10MB
+    max-history: 30
+
+lyrics:
+  path: https://api.lrc.cx/lyrics
+  songName: title
+  singerName: artistName
+lyrics2:
+  path: https://oiapi.net/api/QQMusicLyric
+  songName: keyword
+
+# 搜歌词api示例
+# https://oiapi.net/api/QQMusicLyric?keyword=%E7%88%B1%E6%98%AF%E4%BB%80%E4%B9%88&id=105419532
+# https://api.lrc.cx/lyrics?title=%E7%9B%B8%E6%80%9D%E9%A3%8E%E9%9B%A8%E4%B8%AD&artistName=%E5%BC%A0%E5%AD%A6%E5%8F%8B

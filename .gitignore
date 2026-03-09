@@ -1,0 +1,33 @@
+# Gradle
+.gradle/
+build/
+**/build/
+**/.gradle/
+
+# Android
+*.apk
+*.ap_
+*.aab
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.cursor/
+
+# Node
+node_modules/
+dist/
+
+# Java / Maven
+target/
+*.class
+*.jar
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

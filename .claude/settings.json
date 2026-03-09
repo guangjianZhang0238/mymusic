@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew build --stacktrace)",
+      "Read(//c/Users/zgj/.gradle/**)",
+      "Read(//c/Users/zgj/**)",
+      "Bash(cat ~/.gradle/init.gradle*)",
+      "Bash(./gradlew build --no-daemon)",
+      "Bash(./gradlew clean --no-daemon)"
+    ]
+  }
+}

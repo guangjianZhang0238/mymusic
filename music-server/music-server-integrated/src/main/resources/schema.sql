@@ -1,0 +1,152 @@
+CREATE DATABASE IF NOT EXISTS music_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+USE music_db;
+
+CREATE TABLE IF NOT EXISTS sys_user (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password VARCHAR(100) NOT NULL,
+    nickname VARCHAR(50),
+    avatar VARCHAR(255),
+    phone VARCHAR(20),
+    email VARCHAR(100),
+    status INT DEFAULT 1,
+    role INT DEFAULT 0,
+    last_login_time DATETIME,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS content_artist (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    avatar VARCHAR(255),
+    description TEXT,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS content_album (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    artist_id BIGINT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    cover_url VARCHAR(255),
+    release_date DATE,
+    description TEXT,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS content_song (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    artist_id BIGINT NOT NULL,
+    album_id BIGINT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    file_url VARCHAR(255) NOT NULL,
+    file_size BIGINT,
+    duration INT,
+    sample_rate INT,
+    bit_depth INT,
+    format VARCHAR(20),
+    cover_url VARCHAR(255),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS content_lyrics (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    song_id BIGINT NOT NULL,
+    content TEXT NOT NULL,
+    language VARCHAR(20),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS player_playlist (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    cover_url VARCHAR(255),
+    song_count INT DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS player_playlist_song (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    playlist_id BIGINT NOT NULL,
+    song_id BIGINT NOT NULL,
+    position INT,
+    add_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS player_favorite (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    favorite_type INT NOT NULL,
+    target_id BIGINT NOT NULL,
+    add_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS player_play_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    song_id BIGINT NOT NULL,
+    play_duration INT,
+    play_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS music_song_comment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    song_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    content TEXT NOT NULL,
+    like_count INT DEFAULT 0,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS music_lyrics_share (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    lyrics_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    share_type VARCHAR(20) COMMENT '分享类型：text/image/link',
+    share_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS app_feedback (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    type VARCHAR(50) NOT NULL COMMENT '反馈类型：LYRICS_ERROR/LYRICS_OFFSET/SONG_MISSING/OTHER',
+    content TEXT NOT NULL COMMENT '反馈内容',
+    song_id BIGINT COMMENT '关联歌曲ID',
+    keyword VARCHAR(100) COMMENT '搜索关键词',
+    contact VARCHAR(100) COMMENT '联系方式',
+    scene VARCHAR(50) COMMENT '反馈场景',
+    status VARCHAR(20) DEFAULT 'PENDING' COMMENT '处理状态：PENDING/RESOLVED/FUTURE/UNABLE',
+    handle_note TEXT COMMENT '处理意见',
+    handle_time DATETIME COMMENT '处理时间',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted INT DEFAULT 0,
+    INDEX idx_user_id (user_id),
+    INDEX idx_status (status),
+    INDEX idx_type (type),
+    INDEX idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO sys_user (username, password, nickname, status, role) VALUES 
+('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'admin', 1, 1)
+ON DUPLICATE KEY UPDATE username=username;
