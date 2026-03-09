@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import android.widget.Toast
@@ -273,12 +274,48 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun playSong(song: SongDto) {
         viewModelScope.launch {
             startPlaybackService()
-            playerController.playSong(song, NetworkModule.staticBaseUrl)
-            loadLyricsForSong(song)
-            viewModelScope.launch { repository.addPlayHistory(song) }
+            
+            // 并行启动播放和加载歌词，提高响应速度
+            coroutineScope {
+                launch { 
+                    // 使用缓存播放
+                    playerController.playSongWithCache(song, NetworkModule.staticBaseUrl)
+                    repository.addPlayHistory(song)
+                }
+                launch { loadLyricsForSong(song) }
+            }
+            
+            // 将歌曲添加到播放列表（如果列表为空则创建新列表，否则添加到列表）
+            val currentPlaylist = _uiState.value.playbackPlaylist
+            val currentIndex = _uiState.value.playbackPlaylistIndex
+            
+            if (currentPlaylist.isEmpty()) {
+                // 播放列表为空，创建新列表并播放
+                setPlaybackPlaylist(listOf(song), 0)
+            } else {
+                // 检查歌曲是否已在播放列表中
+                val existingIndex = currentPlaylist.indexOfFirst { it.id == song.id }
+                if (existingIndex >= 0) {
+                    // 歌曲已存在，跳转到该位置播放
+                    playSongFromPlaylist(existingIndex)
+                } else {
+                    // 歌曲不存在，添加到播放列表末尾
+                    val newPlaylist = currentPlaylist + song
+                    val newIndex = newPlaylist.size - 1
+                    _uiState.value = _uiState.value.copy(
+                        playbackPlaylist = newPlaylist,
+                        playbackPlaylistIndex = newIndex,
+                        isPlaybackPlaylistActive = true
+                    )
+                }
+            }
+            
             _uiState.value = _uiState.value.copy(
                 isCurrentSongFavorited = _uiState.value.favoriteSongIds.contains(song.id)
             )
+            
+            // 保存播放列表到服务器
+            savePlaybackPlaylist()
         }
     }
 
@@ -296,15 +333,31 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadLyricsForSong(song: SongDto) {
         viewModelScope.launch {
-            val lyricsData = repository.fetchLyricsWithOffset(song.id)
-            val lyricsMeta = repository.fetchLyricsMeta(song.id)
-            _uiState.value = _uiState.value.copy(
-                currentSong = song,
-                lyrics = lyricsData.first,
-                currentLyricIndex = 0,
-                lyricsOffset = lyricsData.second,
-                currentLyricsId = lyricsMeta?.id
-            )
+            try {
+                // 并行获取歌词数据和元数据，提高加载速度
+                val (lyricsData, lyricsMeta) = withContext(Dispatchers.IO) {
+                    async { repository.fetchLyricsWithOffset(song.id) }.await() to
+                    async { repository.fetchLyricsMeta(song.id) }.await()
+                }
+                
+                _uiState.value = _uiState.value.copy(
+                    currentSong = song,
+                    lyrics = lyricsData.first,
+                    currentLyricIndex = 0,
+                    lyricsOffset = lyricsData.second,
+                    currentLyricsId = lyricsMeta?.id
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("MusicViewModel", "歌词加载失败: ${e.message}", e)
+                // 加载失败时清空歌词显示
+                _uiState.value = _uiState.value.copy(
+                    currentSong = song,
+                    lyrics = emptyList(),
+                    currentLyricIndex = 0,
+                    lyricsOffset = 0f,
+                    currentLyricsId = null
+                )
+            }
         }
     }
     
@@ -366,6 +419,38 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         playSongFromPlaylist(nextIndex)
+        
+        // 预加载下一首歌词（如果是顺序播放）
+        if (_uiState.value.playMode == PlayMode.SEQUENCE || _uiState.value.playMode == PlayMode.LOOP_ONE) {
+            preloadNextSongLyrics(nextIndex)
+        }
+    }
+    
+    /**
+     * 预加载下一首歌曲的歌词
+     */
+    private fun preloadNextSongLyrics(currentIndex: Int) {
+        val playlist = _uiState.value.playbackPlaylist
+        val nextIndex = (currentIndex + 1) % playlist.size
+        
+        // 避免重复预加载相同的歌曲
+        if (nextIndex != currentIndex && nextIndex < playlist.size) {
+            val nextSong = playlist[nextIndex]
+            // 检查是否已经预加载过
+            if (nextSong.id != _uiState.value.currentSong?.id) {
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        // 异步预加载，不影响当前播放
+                        val lyricsData = repository.fetchLyricsWithOffset(nextSong.id)
+                        val lyricsMeta = repository.fetchLyricsMeta(nextSong.id)
+                        // 预加载完成，但不立即更新UI，等实际播放时再使用
+                        android.util.Log.d("MusicViewModel", "预加载歌词完成: ${nextSong.title}")
+                    } catch (e: Exception) {
+                        android.util.Log.w("MusicViewModel", "预加载歌词失败: ${nextSong.title}, ${e.message}")
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -401,11 +486,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         
         val song = playlist[index]
         startPlaybackService()
-        playerController.playSong(song, NetworkModule.staticBaseUrl)
-        loadLyricsForSong(song)
+        
+        // 并行处理：同时播放歌曲和加载歌词
         viewModelScope.launch {
-            repository.addPlayHistory(song)
+            coroutineScope {
+                launch { playerController.playSong(song, NetworkModule.staticBaseUrl) }
+                launch { loadLyricsForSong(song) }
+                launch { repository.addPlayHistory(song) }
+            }
         }
+        
         _uiState.value = _uiState.value.copy(
             playbackPlaylistIndex = index,
             isCurrentSongFavorited = _uiState.value.favoriteSongIds.contains(song.id)
@@ -539,6 +629,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     enabled = settingsList.find { it.settingKey == "equalizer_enabled" }?.settingValue?.toBoolean() ?: false,
                     preset = settingsList.find { it.settingKey == "equalizer_preset" }?.settingValue ?: "",
                     masterGainDb = settingsList.find { it.settingKey == "equalizer_master_gain" }?.settingValue?.toFloatOrNull() ?: 0f,
+                    stereoBalance = settingsList.find { it.settingKey == "equalizer_stereo_balance" }?.settingValue?.toFloatOrNull() ?: 0f,
                     bandGainsDb = settingsList.filter { it.settingKey.startsWith("equalizer_band_") }
                         .sortedBy { it.settingKey }
                         .mapNotNull { it.settingValue.toFloatOrNull() }
@@ -554,6 +645,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun updateUserSettings(settings: UserSettings, immediate: Boolean = false) {
         // 只更新本地状态，不保存到网络
         _userSettings.value = settings
+        
+        // 实时应用均衡器设置
+        if (immediate) {
+            applyEqualizerSettings(settings.equalizer)
+        }
     }
     
     // 保存均衡器设置到服务器（退出均衡器页面时调用）
@@ -564,6 +660,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 repository.saveUserSetting("equalizer_enabled", eq.enabled.toString())
                 eq.preset?.let { repository.saveUserSetting("equalizer_preset", it) }
                 repository.saveUserSetting("equalizer_master_gain", eq.masterGainDb.toString())
+                repository.saveUserSetting("equalizer_stereo_balance", eq.stereoBalance.toString())
                 eq.bandGainsDb.forEachIndexed { index, gain ->
                     repository.saveUserSetting("equalizer_band_$index", gain.toString())
                 }
@@ -574,21 +671,39 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleEqualizerEnabled(enabled: Boolean) {
         val currentSettings = _userSettings.value
         val newEqSettings = currentSettings.equalizer?.copy(enabled = enabled) ?: EqualizerSettings(enabled = enabled)
-        updateUserSettings(currentSettings.copy(equalizer = newEqSettings))
+        updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
     }
 
     fun updateEqualizerMasterGain(gain: Float) {
         val currentSettings = _userSettings.value
         val newEqSettings = currentSettings.equalizer?.copy(masterGainDb = gain) ?: EqualizerSettings(masterGainDb = gain)
-        updateUserSettings(currentSettings.copy(equalizer = newEqSettings))
+        updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
     }
 
     fun updateEqualizerBand(index: Int, gain: Float) {
         val currentSettings = _userSettings.value
-        val newGains = currentSettings.equalizer?.bandGainsDb?.toMutableList() ?: MutableList(10) { 0f }
+        val currentEq = currentSettings.equalizer
+        
+        // 获取当前频段增益列表
+        val newGains = currentEq?.bandGainsDb?.toMutableList() ?: MutableList(10) { 0f }
         newGains[index] = gain
-        val newEqSettings = currentSettings.equalizer?.copy(bandGainsDb = newGains) ?: EqualizerSettings(bandGainsDb = newGains)
-        updateUserSettings(currentSettings.copy(equalizer = newEqSettings))
+        
+        // 检查当前预设模式，如果不是自定义且频段被修改，则切换到自定义模式
+        val shouldSwitchToCustom = currentEq?.preset != null && 
+                                  currentEq.preset != "CUSTOM" && 
+                                  currentEq.preset != "OFF"
+        
+        val newPreset = if (shouldSwitchToCustom) "CUSTOM" else currentEq?.preset ?: "OFF"
+        
+        val newEqSettings = currentEq?.copy(
+            bandGainsDb = newGains,
+            preset = newPreset
+        ) ?: EqualizerSettings(
+            bandGainsDb = newGains,
+            preset = newPreset
+        )
+        
+        updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
     }
 
     fun setEqualizerPreset(preset: EqualizerPreset) {
@@ -598,13 +713,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             "CUSTOM" -> currentSettings.equalizer ?: EqualizerSettings()
             else -> EqualizerSettings(enabled = true, preset = preset.code, bandGainsDb = preset.gains)
         }
-        updateUserSettings(currentSettings.copy(equalizer = newEqSettings))
+        updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
     }
 
+    private fun applyEqualizerSettings(eqSettings: EqualizerSettings?) {
+        if (eqSettings == null) return
+        
+        // 应用均衡器设置到播放控制器
+        playerController.applyEqualizer(
+            enabled = eqSettings.enabled,
+            masterGainDb = eqSettings.masterGainDb,
+            bandGainsDb = eqSettings.bandGainsDb
+        )
+        
+        // 应用声道平衡设置
+        playerController.applyChannelBalance(eqSettings.stereoBalance ?: 0f)
+    }
+    
     fun updateStereoBalance(balance: Float) {
         val currentSettings = _userSettings.value
         val newEqSettings = currentSettings.equalizer?.copy(stereoBalance = balance) ?: EqualizerSettings(stereoBalance = balance)
-        updateUserSettings(currentSettings.copy(equalizer = newEqSettings))
+        updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
     }
 
     fun checkLoginStatus() {
@@ -932,7 +1061,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun startPlaybackService() {
         // 启动前台服务
         val intent = android.content.Intent(getApplication(), com.music.app.player.MusicPlaybackService::class.java)
-        getApplication<Application>().startForegroundService(intent)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            getApplication<Application>().startForegroundService(intent)
+        } else {
+            getApplication<Application>().startService(intent)
+        }
     }
 
     fun loadSearchSuggestions(keyword: String) {
@@ -1076,12 +1209,38 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun getCacheSize(): String {
-        // 简化的缓存大小计算
-        return "0 MB"
+        val bytes = playerController.getCacheSize()
+        return when {
+            bytes < 1024 -> "$bytes B"
+            bytes < 1024 * 1024 -> String.format("%.2f KB", bytes / 1024.0)
+            bytes < 1024 * 1024 * 1024 -> String.format("%.2f MB", bytes / (1024.0 * 1024))
+            else -> String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024))
+        }
+    }
+    
+    /**
+     * 获取已缓存的歌曲数量
+     */
+    fun getCachedSongsCount(): Int {
+        // 这里可以实现实际的缓存歌曲计数逻辑
+        // 目前返回一个估计值或者从缓存管理器获取实际数量
+        return try {
+            val context = getApplication<Application>().applicationContext
+            val cacheDir = context.cacheDir
+            val musicCacheDir = java.io.File(cacheDir, "music_cache")
+            if (musicCacheDir.exists()) {
+                // 统计缓存目录下的文件数量（简单估算）
+                musicCacheDir.listFiles()?.size ?: 0
+            } else {
+                0
+            }
+        } catch (e: Exception) {
+            0
+        }
     }
 
     fun clearCache() {
-        // 简化的缓存清理
+        playerController.clearCache()
     }
 
     fun checkLoginRequired(showWarning: Boolean = false): Boolean {
@@ -1098,12 +1257,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun submitSongFeedback(songId: Long, type: String, content: String, contact: String?) {
         viewModelScope.launch {
-            repository.createFeedbackSimple(
+            _uiState.value = _uiState.value.copy(feedbackPosting = true, feedbackError = null, feedbackSuccess = false)
+            val result = repository.createFeedbackSimple(
                 type = type,
                 content = content,
                 songId = songId,
                 contact = contact
             )
+            if (result != null) {
+                _uiState.value = _uiState.value.copy(feedbackSuccess = true, feedbackPosting = false)
+            } else {
+                _uiState.value = _uiState.value.copy(feedbackError = "提交失败，请稍后重试", feedbackPosting = false)
+            }
         }
     }
 }

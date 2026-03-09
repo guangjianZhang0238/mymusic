@@ -2,7 +2,8 @@ package com.music.app.ui.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -22,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -41,7 +44,7 @@ fun EnhancedVerticalSlider(
     modifier: Modifier = Modifier,
     trackHeight: Dp = 120.dp
 ) {
-    val thumbSize = 24.dp
+    val thumbSize = 16.dp  // 减小拇指尺寸以增加滑动范围
     val thumbRadius = thumbSize / 2
     
     // 计算进度比例 (0.0 到 1.0)
@@ -57,8 +60,9 @@ fun EnhancedVerticalSlider(
         trackBottomY - (trackBottomY - trackTopY) * progress
     }
 
-    // 记录容器的实际像素高度，用于拖动计算
+    // 记录容器的实际像素高度和位置，用于精确定位
     var containerHeightPx by remember { mutableFloatStateOf(0f) }
+    var containerTopPx by remember { mutableFloatStateOf(0f) }
 
     Box(
         modifier = modifier
@@ -67,18 +71,42 @@ fun EnhancedVerticalSlider(
             .onSizeChanged { size ->
                 containerHeightPx = size.height.toFloat()
             }
+            .onGloballyPositioned { coordinates ->
+                // 获取容器在屏幕上的绝对位置
+                containerTopPx = coordinates.positionInRoot().y
+            }
             .then(
                 if (enabled) {
-                    Modifier.pointerInput(valueRange) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            if (containerHeightPx <= 0f) return@detectDragGestures
-                            // 向上拖动（dragAmount.y < 0）增加值，向下减少值
-                            val delta = -dragAmount.y / containerHeightPx
-                            val range = valueRange.endInclusive - valueRange.start
-                            val newValue = (value + delta * range).coerceIn(valueRange.start, valueRange.endInclusive)
-                            onValueChange(newValue)
-                        }
+                    Modifier.pointerInput(Unit) {
+                        detectTapGestures(
+                            onTap = { offset ->
+                                // 点击定位
+                                if (containerHeightPx <= 0f) return@detectTapGestures
+                                val relativeY = offset.y / containerHeightPx
+                                val clampedProgress = 1f - relativeY.coerceIn(0f, 1f)  // 顶部为1，底部为0
+                                val newValue = valueRange.start + clampedProgress * (valueRange.endInclusive - valueRange.start)
+                                onValueChange(newValue)
+                            }
+                        )
+                    }.pointerInput(Unit) {
+                        detectVerticalDragGestures(
+                            onDragStart = { /* 开始拖动 */ },
+                            onDragEnd = { /* 拖动结束 */ },
+                            onDragCancel = { /* 拖动取消 */ },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                if (containerHeightPx <= 0f) return@detectVerticalDragGestures
+                                
+                                // 获取当前触摸点的绝对Y坐标
+                                val currentY = change.position.y
+                                // 转换为相对于容器的进度 (0.0 = 底部, 1.0 = 顶部)
+                                val relativeProgress = 1f - (currentY / containerHeightPx).coerceIn(0f, 1f)
+                                
+                                // 根据进度计算新值
+                                val newValue = valueRange.start + relativeProgress * (valueRange.endInclusive - valueRange.start)
+                                onValueChange(newValue)
+                            }
+                        )
                     }
                 } else Modifier
             ),
@@ -114,6 +142,7 @@ fun EnhancedVerticalSlider(
                 )
         )
 
+        // 拇指指示器 - 作为进度条的端点，位于活动轨道的顶端
         // 拇指指示器 - 作为进度条的端点，位于活动轨道的顶端
         Box(
             modifier = Modifier

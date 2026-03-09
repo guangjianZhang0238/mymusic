@@ -30,9 +30,9 @@ spring:
       force-response: true
   
   datasource:
-    url: jdbc:mysql://localhost:3306/music_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true&connectionCharset=utf8mb4&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2
+    url: jdbc:mysql://103.215.83.202:3306/music_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true&connectionCharset=utf8mb4&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2
     username: root
-    password: 43ae1ff64991
+    password: rDEKHWaEtnJFsKTh
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       # 连接池基本配置
@@ -51,7 +51,7 @@ spring:
       auto-commit: true
   
   redis:
-    host: 127.0.0.1
+    host: 103.215.83.202
     port: 6379
     database: 0
     password: Guangjian38+++
@@ -92,16 +92,16 @@ mybatis-plus:
 
 music:
   storage:
-    base-path: C:\music_folders\music_source
-    temp-path: C:\music_folders\music_temp
+    base-path: C:\project\exercises\mymusic\data_folder\music_source
+    temp-path: C:\project\exercises\mymusic\data_folder\music_temp
     # 单个文件最大上传大小（字节）。2GB
     max-file-size: 2147483648
   
   transcoding:
     ffmpeg:
-      path: C:\Users\zgj\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin\ffmpeg.exe
+      path: C:\ffmpeg\ffmpeg\ffmpeg-8.0.1-essentials_build\bin\ffmpeg.exe
     temp:
-      dir: C:\music_folders\music_transcoding_temp
+      dir: C:\project\exercises\mymusic\data_folder\music_transcoding_temp
     delete-source: true
     auto-transcode: true
   

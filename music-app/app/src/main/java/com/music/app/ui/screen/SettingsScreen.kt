@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -345,6 +346,16 @@ fun SettingsScreen(
                 
                 Spacer(Modifier.height(12.dp))
                 
+                // 缓存说明
+                Text(
+                    "播放过的歌曲会自动缓存到本地，下次播放时优先使用缓存内容，节省流量并提升播放速度。",
+                    color = Color(0xFFBDBDBD),
+                    fontSize = 12.sp,
+                    lineHeight = 16.sp
+                )
+                
+                Spacer(Modifier.height(12.dp))
+                
                 // 缓存路径
                 Text(
                     "缓存路径",
@@ -380,6 +391,17 @@ fun SettingsScreen(
                             fontSize = 14.sp,
                             modifier = Modifier.padding(top = 2.dp)
                         )
+                        
+                        // 添加缓存统计信息
+                        val cachedSongsCount = viewModel.getCachedSongsCount()
+                        if (cachedSongsCount > 0) {
+                            Text(
+                                "$cachedSongsCount 首歌曲已缓存",
+                                color = Color(0xFF4CAF50),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
                     }
                     Button(
                         onClick = { showClearMusicCacheDialog = true },
@@ -396,6 +418,16 @@ fun SettingsScreen(
                         Text("清除歌曲缓存", color = Color.White)
                     }
                 }
+                
+                Spacer(Modifier.height(8.dp))
+                
+                // 缓存使用提示
+                Text(
+                    "提示：缓存会在存储空间不足时自动清理较旧的内容。",
+                    color = Color(0xFF888888),
+                    fontSize = 11.sp,
+                    fontStyle = FontStyle.Italic
+                )
             }
         }
         

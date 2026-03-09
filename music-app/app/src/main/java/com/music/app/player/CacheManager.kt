@@ -1,14 +1,17 @@
 package com.music.app.player
 
 import android.content.Context
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
 import java.io.File
+import java.security.MessageDigest
 
 /**
  * 缓存管理器，确保整个应用只有一个SimpleCache实例
  * 避免多个PlayerController实例同时访问同一缓存目录导致的冲突
  */
+@OptIn(UnstableApi::class)
 object CacheManager {
     private var simpleCache: SimpleCache? = null
     private const val CACHE_DIR_NAME = "music_cache"
@@ -62,6 +65,71 @@ object CacheManager {
         }
     }
     
+    /**
+     * 根据歌曲ID生成缓存键
+     */
+    fun generateCacheKey(songId: Long): String {
+        return "song_$songId"
+    }
+    
+    /**
+     * 根据歌曲文件路径生成缓存键
+     */
+    fun generateCacheKeyFromPath(filePath: String): String {
+        return MessageDigest.getInstance("MD5").digest(filePath.toByteArray()).joinToString("") { "%02x".format(it) }
+    }
+    
+    /**
+     * 检查指定歌曲是否已在缓存中
+     */
+    fun isSongCached(context: Context, songId: Long): Boolean {
+        return try {
+            val cache = getCache(context)
+            val cacheKey = generateCacheKey(songId)
+            cache.getCachedSpans(cacheKey).isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 检查指定文件路径是否已在缓存中
+     */
+    fun isPathCached(context: Context, filePath: String): Boolean {
+        return try {
+            val cache = getCache(context)
+            val cacheKey = generateCacheKeyFromPath(filePath)
+            cache.getCachedSpans(cacheKey).isNotEmpty()
+        } catch (e: Exception) {
+            false
+        }
+    }
+    
+    /**
+     * 获取缓存中的歌曲信息
+     */
+    fun getCachedSongInfo(context: Context, songId: Long): CachedSongInfo? {
+        return try {
+            val cache = getCache(context)
+            val cacheKey = generateCacheKey(songId)
+            val spans = cache.getCachedSpans(cacheKey)
+            
+            if (spans.isNotEmpty()) {
+                val totalSize = spans.sumOf { it.length }
+                CachedSongInfo(
+                    songId = songId,
+                    cacheKey = cacheKey,
+                    cachedSize = totalSize,
+                    isFullyCached = spans.any { it.length > 0 }
+                )
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
     private fun getDirectorySize(dir: File): Long {
         if (!dir.exists()) return 0L
         
@@ -76,3 +144,13 @@ object CacheManager {
         return size
     }
 }
+
+/**
+ * 缓存的歌曲信息数据类
+ */
+data class CachedSongInfo(
+    val songId: Long,
+    val cacheKey: String,
+    val cachedSize: Long,
+    val isFullyCached: Boolean
+)

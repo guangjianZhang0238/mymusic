@@ -19,6 +19,8 @@ import com.music.app.data.remote.FeedbackDto
 import com.music.app.ui.MusicViewModel
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -268,9 +270,18 @@ private fun formatDate(dateTimeStr: String?): String {
     if (dateTimeStr.isNullOrEmpty()) return "未知时间"
     
     return try {
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        val dateTime = LocalDateTime.parse(dateTimeStr.replace("T", " ").take(19))
-        dateTime.format(formatter)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            // API 26及以上使用新的时间API
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+            val dateTime = LocalDateTime.parse(dateTimeStr.replace("T", " ").take(19))
+            dateTime.format(formatter)
+        } else {
+            // API 26以下使用旧的时间API
+            val inputFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
+            val outputFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+            val date = inputFormat.parse(dateTimeStr.take(19))
+            date?.let { outputFormat.format(it) } ?: dateTimeStr
+        }
     } catch (e: Exception) {
         dateTimeStr
     }

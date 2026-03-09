@@ -225,6 +225,44 @@ class PlayerController(private val context: Context) {
     fun playSong(song: SongDto, baseStaticUrl: String) {
         setPlaylist(listOf(song), baseStaticUrl, 0)
     }
+    
+    /**
+     * 智能播放歌曲 - 优先使用缓存，不存在则从网络加载
+     */
+    fun playSongWithCache(song: SongDto, baseStaticUrl: String) {
+        try {
+            // 检查歌曲是否已在缓存中
+            val isCached = CacheManager.isSongCached(context, song.id)
+            
+            if (isCached) {
+                android.util.Log.d("PlayerController", "歌曲 ${song.title} 已在缓存中，直接播放")
+            } else {
+                android.util.Log.d("PlayerController", "歌曲 ${song.title} 未缓存，从网络加载并缓存")
+            }
+            
+            // ExoPlayer会自动处理缓存逻辑
+            playSong(song, baseStaticUrl)
+            
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerController", "播放歌曲失败: ${e.message}", e)
+            // 出错时回退到普通播放
+            playSong(song, baseStaticUrl)
+        }
+    }
+    
+    /**
+     * 获取歌曲缓存状态
+     */
+    fun getSongCacheStatus(songId: Long): CachedSongInfo? {
+        return CacheManager.getCachedSongInfo(context, songId)
+    }
+    
+    /**
+     * 检查歌曲是否已缓存
+     */
+    fun isSongCached(songId: Long): Boolean {
+        return CacheManager.isSongCached(context, songId)
+    }
 
     fun playPauseToggle() {
         if (player.isPlaying) player.pause() else player.play()

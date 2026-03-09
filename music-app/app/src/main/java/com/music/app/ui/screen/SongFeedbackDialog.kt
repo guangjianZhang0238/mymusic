@@ -29,7 +29,14 @@ fun SongFeedbackDialog(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var selectedFeedbackType by remember { mutableStateOf<String?>(null) }
     var customReason by remember { mutableStateOf("") }
-    var isSubmitting by remember { mutableStateOf(false) }
+    
+    // 提交成功后自动关闭弹窗
+    LaunchedEffect(uiState.feedbackSuccess) {
+        if (uiState.feedbackSuccess) {
+            kotlinx.coroutines.delay(1500)
+            onDismiss()
+        }
+    }
     
     val feedbackTypes = listOf(
         "歌词错误" to "LYRICS_ERROR",
@@ -192,9 +199,8 @@ fun SongFeedbackDialog(
                     
                     Button(
                         onClick = {
-                            if (selectedFeedbackType != null && 
+                            if (selectedFeedbackType != null &&
                                 (selectedFeedbackType != "OTHER" || customReason.isNotBlank())) {
-                                isSubmitting = true
                                 val content = if (selectedFeedbackType == "OTHER") {
                                     customReason
                                 } else {
@@ -211,9 +217,9 @@ fun SongFeedbackDialog(
                                 }
                             }
                         },
-                        enabled = selectedFeedbackType != null && 
-                                 (selectedFeedbackType != "OTHER" || customReason.isNotBlank()) && 
-                                 !isSubmitting,
+                        enabled = selectedFeedbackType != null &&
+                                 (selectedFeedbackType != "OTHER" || customReason.isNotBlank()) &&
+                                 !uiState.feedbackPosting,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFFE53935),
                             disabledContainerColor = Color(0xFF444444),
@@ -221,7 +227,7 @@ fun SongFeedbackDialog(
                             disabledContentColor = Color(0xFF888888)
                         )
                     ) {
-                        if (isSubmitting) {
+                        if (uiState.feedbackPosting) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(16.dp),
                                 strokeWidth = 2.dp,

@@ -64,6 +64,11 @@ fun EqualizerDialog(
     val presets = listOf(
         EqualizerPreset.OFF,
         EqualizerPreset.CUSTOM,
+        // 专业推荐预设
+        EqualizerPreset.HIFI_AUDIOPHILE,
+        EqualizerPreset.LIVE_PERFORMANCE,
+        EqualizerPreset.VOCAL_FOCUS,
+        // 经典预设
         EqualizerPreset.PERFECT_BASS,
         EqualizerPreset.ROCK,
         EqualizerPreset.VOCAL
@@ -458,24 +463,14 @@ fun EqualizerDialog(
                                                 )
                                             }
 
-                                            // 频段标签和频率信息
-                                            Column(
-                                                horizontalAlignment = Alignment.CenterHorizontally,
-                                                modifier = Modifier.padding(top = 4.dp)
-                                            ) {
-                                                Text(
-                                                    label,
-                                                    color = Color(0xFFDDDDDD),
-                                                    fontWeight = FontWeight.Medium,
-                                                    fontSize = 10.sp
-                                                )
-                                                Text(
-                                                    "${EqualizerBandsHz[index]}Hz",
-                                                    color = Color(0xFFAAAAAA),
-                                                    fontSize = 8.sp,
-                                                    modifier = Modifier.padding(top = 1.dp)
-                                                )
-                                            }
+                                            // 频段标签
+                                            Text(
+                                                label,
+                                                color = Color(0xFFDDDDDD),
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 8.sp,  // 减小字体避免换行
+                                                maxLines = 1
+                                            )
 
                                             // 频段指示灯
                                             Box(
