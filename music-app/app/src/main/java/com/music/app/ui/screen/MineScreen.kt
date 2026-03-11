@@ -285,7 +285,7 @@ private fun SongItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    song.artistName ?: "未知歌手",
+                    song.artistNames ?: song.artistName ?: "未知歌手",
                     color = Color(0xFFBDBDBD),
                     fontSize = 12.sp,
                     maxLines = 1,

@@ -9,8 +9,10 @@ import com.music.common.exception.BusinessException;
 import com.music.content.entity.Album;
 import com.music.content.entity.Artist;
 import com.music.content.entity.Song;
+import com.music.content.entity.SongArtist;
 import com.music.content.mapper.AlbumMapper;
 import com.music.content.mapper.ArtistMapper;
+import com.music.content.mapper.SongArtistMapper;
 import com.music.content.mapper.SongMapper;
 import com.music.content.service.ArtistService;
 import com.music.file.config.StorageConfig;
@@ -21,7 +23,9 @@ import org.springframework.util.StringUtils;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +33,7 @@ public class ArtistServiceImpl extends ServiceImpl<ArtistMapper, Artist> impleme
     
     private final AlbumMapper albumMapper;
     private final SongMapper songMapper;
+    private final SongArtistMapper songArtistMapper;
     private final StorageConfig storageConfig;
     
     @Override
@@ -58,11 +63,10 @@ public class ArtistServiceImpl extends ServiceImpl<ArtistMapper, Artist> impleme
             
             Long albumCount = albumMapper.selectCount(new LambdaQueryWrapper<Album>()
                     .eq(Album::getArtistId, artist.getId()));
-            Long songCount = songMapper.selectCount(new LambdaQueryWrapper<Song>()
-                    .eq(Song::getArtistId, artist.getId()));
+            int songCount = countSongsByArtist(artist.getId());
             
             vo.setAlbumCount(albumCount.intValue());
-            vo.setSongCount(songCount.intValue());
+            vo.setSongCount(songCount);
             
             return vo;
         }).toList());
@@ -87,11 +91,10 @@ public class ArtistServiceImpl extends ServiceImpl<ArtistMapper, Artist> impleme
         
         Long albumCount = albumMapper.selectCount(new LambdaQueryWrapper<Album>()
                 .eq(Album::getArtistId, id));
-        Long songCount = songMapper.selectCount(new LambdaQueryWrapper<Song>()
-                .eq(Song::getArtistId, id));
+        int songCount = countSongsByArtist(id);
         
         vo.setAlbumCount(albumCount.intValue());
-        vo.setSongCount(songCount.intValue());
+        vo.setSongCount(songCount);
         
         return vo;
     }
@@ -198,5 +201,15 @@ public class ArtistServiceImpl extends ServiceImpl<ArtistMapper, Artist> impleme
         result.put("totalCount", addedCount + skippedCount);
         
         return result;
+    }
+
+    /** 统计歌手参与的歌曲数（主唱 + content_song_artist 中的合唱） */
+    private int countSongsByArtist(Long artistId) {
+        Set<Long> songIds = new HashSet<>();
+        songMapper.selectList(new LambdaQueryWrapper<Song>().eq(Song::getArtistId, artistId))
+                .forEach(s -> songIds.add(s.getId()));
+        songArtistMapper.selectList(new LambdaQueryWrapper<SongArtist>().eq(SongArtist::getArtistId, artistId))
+                .forEach(sa -> songIds.add(sa.getSongId()));
+        return songIds.size();
     }
 }

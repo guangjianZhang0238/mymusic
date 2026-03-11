@@ -106,7 +106,7 @@ fun AlbumDetailScreen(
                         SongListItem(
                             index = index + 1,
                             title = song.title,
-                            artist = song.artistName ?: "未知歌手",
+                            artist = song.artistNames ?: song.artistName ?: "未知歌手",
                             onClick = { 
                                 // 单曲点击：添加到播放列表（不替换）
                                 if (uiState.isLoggedIn) {

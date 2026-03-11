@@ -119,6 +119,43 @@
               </div>
             </template>
           </el-table-column>
+          <el-table-column label="合唱歌手" width="300">
+            <template #default="scope">
+              <div class="chorus-selector">
+                <el-autocomplete
+                  v-model="scope.row.chorusKeyword"
+                  :fetch-suggestions="searchChorusArtists"
+                  placeholder="输入歌手名搜索并从下拉中选择（可不填）"
+                  @select="(item) => handleChorusSelect(scope.row, item)"
+                  clearable
+                  style="width: 100%"
+                >
+                  <template #default="{ item }">
+                    <div class="artist-suggestion">
+                      <span class="artist-name">{{ item.name }}</span>
+                      <span class="artist-stats">{{ item.albumCount }}专辑 {{ item.songCount }}歌曲</span>
+                    </div>
+                  </template>
+                </el-autocomplete>
+                <div
+                  v-if="scope.row.chorusArtists && scope.row.chorusArtists.length"
+                  class="chorus-tags"
+                >
+                  <span class="chorus-tags-label">已选合唱歌手：</span>
+                  <el-tag
+                    v-for="artist in scope.row.chorusArtists"
+                    :key="artist.id ?? artist.name"
+                    size="small"
+                    closable
+                    @close="removeChorusArtist(scope.row, artist)"
+                    class="chorus-tag-item"
+                  >
+                    {{ artist.name }}
+                  </el-tag>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column prop="size" label="大小" width="120">
             <template #default="scope">
               {{ formatFileSize(scope.row.size) }}
@@ -231,12 +268,16 @@ type Album = {
   artistId?: number
 }
 
+type ChorusArtist = { id?: number; name: string }
+
 type PendingFile = {
   file: File
   name: string
   size: number
   progress: number
   status: 'pending' | 'uploading' | 'success' | 'error'
+  chorusArtists: ChorusArtist[]
+  chorusKeyword?: string
 }
 
 const MAX_FILES_PER_BATCH = 100
@@ -532,9 +573,44 @@ const addFiles = (files: File[]) => {
       name: file.name,
       size: file.size,
       progress: 0,
-      status: 'pending'
+      status: 'pending',
+      chorusArtists: [],
+      chorusKeyword: ''
     })
   }
+}
+
+const searchChorusArtists = async (keyword: string, callback: (results: Artist[]) => void) => {
+  if (!keyword?.trim()) {
+    callback([])
+    return
+  }
+  try {
+    const res = await request.get('/music-metadata/artists/search', {
+      params: { keyword: keyword.trim(), limit: 20 }
+    })
+    callback(res || [])
+  } catch (e) {
+    console.error('搜索合唱歌手失败:', e)
+    callback([])
+  }
+}
+
+const handleChorusSelect = (row: PendingFile, item: Artist) => {
+  if (!row.chorusArtists) {
+    row.chorusArtists = []
+  }
+  const exists = row.chorusArtists.some(a => a.id === item.id || a.name === item.name)
+  if (!exists) {
+    row.chorusArtists.push({ id: item.id, name: item.name })
+  }
+  row.chorusKeyword = ''
+}
+
+const removeChorusArtist = (row: PendingFile, artist: ChorusArtist) => {
+  row.chorusArtists = row.chorusArtists.filter(
+    a => !(a.id === artist.id && a.name === artist.name)
+  )
 }
 
 // 移除文件
@@ -622,6 +698,11 @@ const uploadSingleFile = async (pendingFile: PendingFile, albumId: number, index
   const formData = new FormData()
   formData.append('file', pendingFile.file)
   formData.append('albumId', albumId.toString())
+  const chorusArtists = pendingFile.chorusArtists || []
+  for (const a of chorusArtists) {
+    if (a.id != null) formData.append('chorusArtistIds', String(a.id))
+    if (a.name) formData.append('chorusArtistNames', a.name)
+  }
   
   // 文件预检查
   if (pendingFile.file.size === 0) {

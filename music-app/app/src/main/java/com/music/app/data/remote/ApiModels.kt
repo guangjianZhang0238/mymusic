@@ -23,6 +23,7 @@ data class SongDto(
     val title: String = "",
     val titleEn: String? = null,
     val artistName: String? = null,
+    val artistNames: String? = null,
     val filePath: String? = null,
     val albumName: String? = null,
     val albumCover: String? = null,
@@ -296,7 +297,8 @@ data class EqualizerSettings(
     val preset: String = "OFF", // OFF / PERFECT_BASS / ROCK / VOCAL / CUSTOM
     val masterGainDb: Float = 0f,
     val bandGainsDb: List<Float> = List(10) { 0f },
-    val stereoBalance: Float = 0f  // -1f=纯左声道, 0f=居中, 1f=纯右声道
+    val stereoBalance: Float = 0f,  // -1f=纯左声道, 0f=居中, 1f=纯右声道
+    val pitchShiftSemitones: Int = 0 // 以半音为单位的升降调，范围建议 [-12, 12]
 )
 
 @Serializable

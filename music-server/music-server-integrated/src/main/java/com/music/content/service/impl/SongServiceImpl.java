@@ -52,10 +52,18 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
                    .like(Song::getTitleEn, query.getKeyword());
         }
         if (query.getArtistId() != null) {
-            wrapper.eq(Song::getArtistId, query.getArtistId());
+            // 包含主歌手或合唱歌手的歌曲（content_song_artist 关联）
+            wrapper.and(w -> w.eq(Song::getArtistId, query.getArtistId())
+                    .or().inSql(Song::getId, "SELECT song_id FROM content_song_artist WHERE artist_id = " + query.getArtistId() + " AND deleted = 0"));
         }
         if (query.getAlbumId() != null) {
-            wrapper.eq(Song::getAlbumId, query.getAlbumId());
+            // 支持：既包含挂在 content_song.album_id 下的歌曲，也包含通过 content_album_song 关联到该专辑的歌曲
+            Long albumId = query.getAlbumId();
+            wrapper.and(w -> w.eq(Song::getAlbumId, albumId)
+                    .or()
+                    .inSql(Song::getId,
+                            "SELECT song_id FROM content_album_song WHERE album_id = "
+                                    + albumId + " AND deleted = 0"));
         }
         if (StringUtils.hasText(query.getFormat())) {
             wrapper.eq(Song::getFormat, query.getFormat());
@@ -272,6 +280,12 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
         Artist artist = artistMapper.selectById(song.getArtistId());
         if (artist != null) {
             vo.setArtistName(artist.getName());
+        }
+        // 如果数据库中已经维护了多歌手名称，则优先使用聚合后的名称用于展示
+        if (song.getArtistNames() != null && !song.getArtistNames().isEmpty()) {
+            vo.setArtistNames(song.getArtistNames());
+        } else if (artist != null) {
+            vo.setArtistNames(artist.getName());
         }
         
         Album album = albumMapper.selectById(song.getAlbumId());

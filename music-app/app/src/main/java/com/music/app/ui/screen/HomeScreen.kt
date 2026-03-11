@@ -87,7 +87,8 @@ fun HomeScreen(viewModel: MusicViewModel) {
                     }
                 },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE53935)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 modifier = Modifier
                     .height(32.dp)
@@ -95,19 +96,18 @@ fun HomeScreen(viewModel: MusicViewModel) {
             ) {
                 Text(
                     text = "换一批",
-                    color = Color.White,
                     fontSize = 12.sp
                 )
             }
         }
 
         if (uiState.loading) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                CircularProgressIndicator(color = Color(0xFFE53935))
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                }
         } else {
             LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(uiState.hotSongs) { song ->
@@ -136,7 +136,7 @@ private fun SongItem(song: SongDto, onClick: () -> Unit) {
         Column(modifier = Modifier.padding(14.dp)) {
             Text(text = song.title, color = Color.White, fontWeight = FontWeight.SemiBold)
             Text(
-                text = song.artistName ?: "未知歌手",
+                text = song.artistNames ?: song.artistName ?: "未知歌手",
                 color = Color(0xFFB0B0B0),
                 modifier = Modifier.padding(top = 4.dp)
             )

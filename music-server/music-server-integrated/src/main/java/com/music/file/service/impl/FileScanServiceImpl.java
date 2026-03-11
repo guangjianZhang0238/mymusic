@@ -4,9 +4,11 @@ import com.music.api.dto.SongDTO;
 import com.music.content.entity.Album;
 import com.music.content.entity.Artist;
 import com.music.content.entity.Song;
+import com.music.content.entity.SongArtist;
 import com.music.content.mapper.AlbumMapper;
 import com.music.content.mapper.ArtistMapper;
 import com.music.content.mapper.SongMapper;
+import com.music.content.mapper.SongArtistMapper;
 import com.music.content.service.SongService;
 import com.music.file.config.StorageConfig;
 import com.music.file.entity.TranscodingResult;
@@ -45,6 +47,7 @@ public class FileScanServiceImpl implements FileScanService {
     private final ArtistMapper artistMapper;
     private final AlbumMapper albumMapper;
     private final SongMapper songMapper;
+    private final SongArtistMapper songArtistMapper;
     private final AudioTranscodingService transcodingService;
 
     @Override
@@ -249,7 +252,6 @@ public class FileScanServiceImpl implements FileScanService {
                 }
             }
             
-            // 创建歌曲DTO
             SongDTO songDTO = new SongDTO();
             songDTO.setArtistId(artist.getId());
             songDTO.setAlbumId(album.getId());
@@ -299,11 +301,30 @@ public class FileScanServiceImpl implements FileScanService {
             }
             songDTO.setDuration(duration);
             
+            // 若上传已创建该歌曲（同专辑同文件名），则仅更新文件信息（如转码后路径、时长）
+            Song existingByBasename = findSongByAlbumAndBasename(album.getId(), songTitle, allSongs);
+            if (existingByBasename != null) {
+                existingByBasename.setFilePath(filePath);
+                existingByBasename.setFileName(fileName);
+                existingByBasename.setFileSize(processedFile.length());
+                existingByBasename.setFormat(originalFormat);
+                existingByBasename.setDuration(duration);
+                songMapper.updateById(existingByBasename);
+                result.incrementUpdatedSongs();
+                if (sourceFileToDelete != null && sourceFileToDelete.exists()) {
+                    sourceFileToDelete.delete();
+                }
+                return;
+            }
+            
             // 保存歌曲
             Long songId = songService.create(songDTO);
             if (songId != null) {
                 log.info("新增歌曲成功: {}/{}/{}", artist.getName(), album.getName(), songTitle);
                 result.incrementAddedSongs();
+                
+                // 为该歌曲写入主歌手关联（扫描发现的文件无合唱信息，仅主歌手）
+                linkArtistsForSong(songId, artist, List.of());
                 
                 // 入库成功后，如果有需要删除的原始文件（WAV/DSF转码后），则删除之
                 if (sourceFileToDelete != null && sourceFileToDelete.exists()) {
@@ -580,6 +601,21 @@ public class FileScanServiceImpl implements FileScanService {
         }
         return false;
     }
+
+    /** 按专辑ID和文件名（不含扩展名）查找歌曲，用于识别上传已创建的记录 */
+    private Song findSongByAlbumAndBasename(Long albumId, String basename, List<Song> allSongs) {
+        if (albumId == null || basename == null) return null;
+        String lower = basename.toLowerCase();
+        for (Song song : allSongs) {
+            if (!Objects.equals(song.getAlbumId(), albumId)) continue;
+            String fn = song.getFileName();
+            if (fn == null) continue;
+            int dot = fn.lastIndexOf('.');
+            String base = dot > 0 ? fn.substring(0, dot).toLowerCase() : fn.toLowerCase();
+            if (base.equals(lower)) return song;
+        }
+        return null;
+    }
     
     /**
      * 查找专辑文件夹中的歌曲文件
@@ -608,6 +644,66 @@ public class FileScanServiceImpl implements FileScanService {
         }
         
         return songFiles;
+    }
+    
+    /**
+     * 为歌曲写入主歌手与可选合唱歌手到关联表 content_song_artist。
+     */
+    private void linkArtistsForSong(Long songId, Artist mainArtist, List<Long> chorusArtistIds) {
+        if (songId == null || mainArtist == null) {
+            return;
+        }
+        try {
+            // 聚合所有相关歌手ID（主歌手 + 合唱歌手），用于后续写入 Song.artistNames
+            List<Long> allArtistIds = new ArrayList<>();
+            allArtistIds.add(mainArtist.getId());
+            if (chorusArtistIds != null) {
+                for (Long id : chorusArtistIds) {
+                    if (id != null && !Objects.equals(id, mainArtist.getId()) && !allArtistIds.contains(id)) {
+                        allArtistIds.add(id);
+                    }
+                }
+            }
+            
+            // 主歌手
+            SongArtist main = new SongArtist();
+            main.setSongId(songId);
+            main.setArtistId(mainArtist.getId());
+            main.setSortOrder(0);
+            songArtistMapper.insert(main);
+            
+            if (chorusArtistIds != null && !chorusArtistIds.isEmpty()) {
+                int order = 1;
+                for (Long chorusId : chorusArtistIds) {
+                    if (chorusId == null || Objects.equals(chorusId, mainArtist.getId())) {
+                        continue;
+                    }
+                    SongArtist chorus = new SongArtist();
+                    chorus.setSongId(songId);
+                    chorus.setArtistId(chorusId);
+                    chorus.setSortOrder(order++);
+                    songArtistMapper.insert(chorus);
+                }
+            }
+            
+            // 维护 content_song.artistNames 便于前端直接展示“张学友 / 梅艳芳”
+            Song song = songService.getById(songId);
+            if (song != null) {
+                List<String> artistNames = new ArrayList<>();
+                for (Long id : allArtistIds) {
+                    Artist a = artistMapper.selectById(id);
+                    if (a != null && a.getName() != null && !a.getName().isEmpty()) {
+                        artistNames.add(a.getName());
+                    }
+                }
+                if (!artistNames.isEmpty()) {
+                    song.setArtistNames(String.join(" / ", artistNames));
+                    songService.updateById(song);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("写入多歌手关联失败，不影响歌曲入库: songId={}, error={}", songId, e.getMessage());
+        }
     }
     
     /**

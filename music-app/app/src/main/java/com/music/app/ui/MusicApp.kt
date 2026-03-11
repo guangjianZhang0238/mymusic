@@ -142,7 +142,7 @@ fun MusicApp(viewModel: MusicViewModel = viewModel()) {
             Column {
                 MiniPlayerBar(
                     songName = uiState.currentSong?.title ?: "",
-                    artist = uiState.currentSong?.artistName ?: "",
+                    artist = uiState.currentSong?.artistNames ?: uiState.currentSong?.artistName ?: "",
                     isPlaying = uiState.isPlaying,
                     onClick = {
                         if (uiState.currentSong != null) {
@@ -364,7 +364,7 @@ private fun MiniPlayerBar(
             Icon(
                 if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                 contentDescription = if (isPlaying) "暂停" else "播放",
-                tint = Color(0xFFE53935),
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
         }
@@ -456,7 +456,7 @@ fun PlayerDialog(
                                     val isCurrent = index == uiState.currentLyricIndex
                                     Text(
                                         text = line.text.ifBlank { "..." },
-                                        color = if (isCurrent) Color(0xFFE53935) else Color.White,
+                                        color = if (isCurrent) MaterialTheme.colorScheme.primary else Color.White,
                                         fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
                                         fontSize = if (isCurrent) 20.sp else 16.sp,
                                         modifier = Modifier.padding(vertical = 8.dp),
@@ -486,7 +486,7 @@ fun PlayerDialog(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = uiState.currentSong?.artistName ?: "",
+                                    text = uiState.currentSong?.artistNames ?: uiState.currentSong?.artistName ?: "",
                                     color = Color(0xFFBDBDBD),
                                     modifier = Modifier.padding(top = 4.dp),
                                     fontSize = 14.sp
@@ -503,12 +503,14 @@ fun PlayerDialog(
                             IconButton(onClick = { showCommentsDialog = true }) {
                                 Icon(Icons.Default.Comment, contentDescription = "评论", tint = Color.White)
                             }
-                            IconButton(onClick = { 
-                                if (viewModel.checkLoginRequired(showWarning = true)) {
-                                    showEqualizerDialog = true
+                            IconButton(
+                                onClick = { 
+                                    if (viewModel.checkLoginRequired(showWarning = true)) {
+                                        showEqualizerDialog = true
+                                    }
                                 }
-                            }) {
-                                Icon(Icons.Default.Tune, contentDescription = "均衡器", tint = Color.White)
+                            ) {
+                                Icon(Icons.Default.Tune, contentDescription = "效果器", tint = Color.White)
                             }
                         }
                     }
@@ -534,7 +536,7 @@ fun PlayerDialog(
                                     PlayMode.SHUFFLE -> Icons.Default.Shuffle
                                 },
                                 contentDescription = null,
-                                tint = if (uiState.playMode == PlayMode.SEQUENCE) Color.White else Color(0xFFE53935)
+                                tint = if (uiState.playMode == PlayMode.SEQUENCE) Color.White else MaterialTheme.colorScheme.primary
                             )
                         }
                         IconButton(onClick = { viewModel.previousSong() }) { Icon(Icons.Default.SkipPrevious, contentDescription = null, tint = Color.White) }
@@ -542,16 +544,21 @@ fun PlayerDialog(
                             onClick = { viewModel.togglePlayPause() },
                             modifier = Modifier
                                 .size(60.dp)
-                                .background(Color(0xFFE53935), shape = androidx.compose.foundation.shape.CircleShape)
+                                .background(MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape)
                         ) {
-                            Icon(if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(32.dp))
+                            Icon(
+                                if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimary,
+                                modifier = Modifier.size(32.dp)
+                            )
                         }
                         IconButton(onClick = { viewModel.nextSong() }) { Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White) }
                         IconButton(onClick = { viewModel.toggleFavorite() }) {
                             Icon(
                                 if (uiState.isCurrentSongFavorited) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                                 contentDescription = null,
-                                tint = if (uiState.isCurrentSongFavorited) Color(0xFFE53935) else Color.White
+                                tint = if (uiState.isCurrentSongFavorited) MaterialTheme.colorScheme.primary else Color.White
                             )
                         }
                     }

@@ -2,10 +2,14 @@ package com.music.file.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.music.content.entity.Album;
+import com.music.content.entity.AlbumSong;
 import com.music.content.entity.Lyrics;
 import com.music.content.entity.Song;
+import com.music.content.entity.SongArtist;
 import com.music.content.mapper.AlbumMapper;
+import com.music.content.mapper.AlbumSongMapper;
 import com.music.content.mapper.LyricsMapper;
+import com.music.content.mapper.SongArtistMapper;
 import com.music.content.mapper.SongMapper;
 import com.music.file.config.StorageConfig;
 import com.music.file.service.DataCleanupService;
@@ -31,6 +35,8 @@ public class DataCleanupServiceImpl implements DataCleanupService {
     private final SongMapper songMapper;
     private final LyricsMapper lyricsMapper;
     private final AlbumMapper albumMapper;
+    private final SongArtistMapper songArtistMapper;
+    private final AlbumSongMapper albumSongMapper;
     private final StorageConfig storageConfig;
 
     @Override
@@ -91,10 +97,10 @@ public class DataCleanupServiceImpl implements DataCleanupService {
 
             String filePath = song.getFilePath();
             if (!StringUtils.hasText(filePath)) {
-                // 文件路径为空，直接删除
-                songMapper.deleteById(song.getId());
+                // 文件路径为空，直接删除并清理关联数据
+                deleteSongWithRelations(song);
                 deleted++;
-                log.info("删除文件路径为空的歌曲记录: id={}, title={}", song.getId(), song.getTitle());
+                log.info("删除文件路径为空的歌曲记录及其关联关系: id={}, title={}", song.getId(), song.getTitle());
                 continue;
             }
 
@@ -107,15 +113,47 @@ public class DataCleanupServiceImpl implements DataCleanupService {
             }
 
             if (!file.exists() || !file.isFile()) {
-                songMapper.deleteById(song.getId());
+                deleteSongWithRelations(song);
                 deleted++;
-                log.info("删除文件不存在的歌曲记录: id={}, title={}, filePath={}",
+                log.info("删除文件不存在的歌曲记录及其关联关系: id={}, title={}, filePath={}",
                         song.getId(), song.getTitle(), filePath);
             }
         }
 
         log.info("歌曲表清理完成：共检查 {} 条，删除 {} 条", total, deleted);
         return deleted;
+    }
+
+    /**
+     * 删除歌曲主记录及其与歌手、专辑等的关联关系。
+     * 目前包含：
+     * - content_song_artist 中的所有该歌曲关联
+     * - content_album_song 中的所有该歌曲被专辑收录的关联
+     */
+    private void deleteSongWithRelations(Song song) {
+        if (song == null || song.getId() == null) {
+            return;
+        }
+        Long songId = song.getId();
+
+        // 删除歌曲-歌手关联（主唱 + 合唱）
+        LambdaQueryWrapper<SongArtist> saWrapper = new LambdaQueryWrapper<>();
+        saWrapper.eq(SongArtist::getSongId, songId);
+        int saDeleted = songArtistMapper.delete(saWrapper);
+        if (saDeleted > 0) {
+            log.info("已删除歌曲的歌手关联记录 {} 条: songId={}", saDeleted, songId);
+        }
+
+        // 删除专辑-歌曲收录关联（支持一首歌被多个专辑收录）
+        LambdaQueryWrapper<AlbumSong> asWrapper = new LambdaQueryWrapper<>();
+        asWrapper.eq(AlbumSong::getSongId, songId);
+        int asDeleted = albumSongMapper.delete(asWrapper);
+        if (asDeleted > 0) {
+            log.info("已删除歌曲的专辑收录关联记录 {} 条: songId={}", asDeleted, songId);
+        }
+
+        // 最后删除歌曲主记录
+        songMapper.deleteById(songId);
     }
 
     @Override
@@ -172,11 +210,17 @@ public class DataCleanupServiceImpl implements DataCleanupService {
             }
 
             // 查询该专辑下是否还有歌曲
-            LambdaQueryWrapper<Song> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Song::getAlbumId, album.getId());
-            Long songCount = songMapper.selectCount(wrapper);
+            // 1) 旧模型：content_song.album_id
+            LambdaQueryWrapper<Song> songWrapper = new LambdaQueryWrapper<>();
+            songWrapper.eq(Song::getAlbumId, album.getId());
+            Long directSongCount = songMapper.selectCount(songWrapper);
 
-            if (songCount == 0) {
+            // 2) 新模型：content_album_song 多对多关联
+            LambdaQueryWrapper<AlbumSong> albumSongWrapper = new LambdaQueryWrapper<>();
+            albumSongWrapper.eq(AlbumSong::getAlbumId, album.getId());
+            Long linkedSongCount = albumSongMapper.selectCount(albumSongWrapper);
+
+            if (directSongCount == 0 && linkedSongCount == 0) {
                 albumMapper.deleteById(album.getId());
                 deleted++;
                 log.info("删除空专辑记录: id={}, name={}", album.getId(), album.getName());

@@ -155,7 +155,7 @@ class MusicRepository {
                 PlayHistoryRequest(
                     songId = song.id,
                     songTitle = song.title,
-                    artistName = song.artistName,
+                    artistName = song.artistNames ?: song.artistName,
                     albumName = song.albumName,
                     coverImage = song.albumCover,
                     durationPlayed = durationPlayed

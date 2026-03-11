@@ -65,7 +65,7 @@ fun AlbumSongsScreen(albumId: Long, viewModel: MusicViewModel) {
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold)
-                            Text(song.artistName ?: "未知歌手", color = Color(0xFFBDBDBD))
+                            Text(song.artistNames ?: song.artistName ?: "未知歌手", color = Color(0xFFBDBDBD))
                         }
                     }
                 }

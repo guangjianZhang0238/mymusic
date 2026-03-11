@@ -103,7 +103,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
             modifier = Modifier.padding(top = 14.dp)
         )
         Text(
-            text = uiState.currentSong?.artistName ?: "",
+            text = uiState.currentSong?.artistNames ?: uiState.currentSong?.artistName ?: "",
             color = Color(0xFFBDBDBD),
             modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
         )
@@ -141,7 +141,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
                         PlayMode.LOOP_ONE -> "单曲循环"
                         PlayMode.SHUFFLE -> "随机播放"
                     },
-                    tint = if (uiState.playMode == PlayMode.SEQUENCE) Color.White else Color(0xFFE53935)
+                    tint = if (uiState.playMode == PlayMode.SEQUENCE) Color.White else MaterialTheme.colorScheme.primary
                 )
             }
             IconButton(onClick = { viewModel.previousSong() }) {
@@ -151,7 +151,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
                 Icon(
                     if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = null,
-                    tint = Color(0xFFE53935)
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
             IconButton(onClick = { viewModel.nextSong() }) {
@@ -161,7 +161,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
                 Icon(
                     if (uiState.isCurrentSongFavorited) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                     contentDescription = if (uiState.isCurrentSongFavorited) "取消收藏" else "收藏",
-                    tint = if (uiState.isCurrentSongFavorited) Color(0xFFE53935) else Color.White
+                    tint = if (uiState.isCurrentSongFavorited) MaterialTheme.colorScheme.primary else Color.White
                 )
             }
             
@@ -173,7 +173,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
                 Icon(
                     Icons.Default.Feedback,
                     contentDescription = "歌曲反馈",
-                    tint = if (uiState.currentSong != null && uiState.isLoggedIn) Color(0xFFE53935) else Color(0xFF666666)
+                    tint = if (uiState.currentSong != null && uiState.isLoggedIn) MaterialTheme.colorScheme.primary else Color(0xFF666666)
                 )
             }
         }
@@ -260,7 +260,7 @@ private fun ColumnScope.LyricsTab(
             Icon(
                 Icons.Default.Share,
                 contentDescription = "分享歌词",
-                tint = if (uiState.currentSong != null && uiState.isLoggedIn) Color(0xFFE53935) else Color(0xFF666666)
+                tint = if (uiState.currentSong != null && uiState.isLoggedIn) MaterialTheme.colorScheme.primary else Color(0xFF666666)
             )
         }
     }
@@ -312,27 +312,27 @@ private fun ColumnScope.LyricsTab(
                         )
                     }
                 } else {
-                    OutlinedButton(
-                        onClick = {
-                            uiState.currentSong?.let { 
-                                viewModel.submitNoLyricsFeedback(it.id)
-                                showNoLyricsFeedbackSent = true
-                            }
-                        },
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = Color(0xFFE53935)
-                        ),
-                        border = BorderStroke(1.dp, Color(0xFFE53935)),
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Feedback,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("没有歌词？点击反馈", fontSize = 13.sp)
-                    }
+                        OutlinedButton(
+                            onClick = {
+                                uiState.currentSong?.let { 
+                                    viewModel.submitNoLyricsFeedback(it.id)
+                                    showNoLyricsFeedbackSent = true
+                                }
+                            },
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.primary
+                            ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Feedback,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("没有歌词？点击反馈", fontSize = 13.sp)
+                        }
                 }
             } else {
                 Text(
@@ -354,7 +354,7 @@ private fun ColumnScope.LyricsTab(
                 val isCurrent = index == uiState.currentLyricIndex
                 Text(
                     text = line.text.ifBlank { "..." },
-                    color = if (isCurrent) Color(0xFFE53935) else Color(0xFFCCCCCC),
+                    color = if (isCurrent) MaterialTheme.colorScheme.primary else Color(0xFFCCCCCC),
                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
                     fontSize = if (isCurrent) 16.sp else 14.sp,
                     modifier = Modifier.padding(vertical = 6.dp)
@@ -395,7 +395,7 @@ private fun ColumnScope.CommentsTab(
                         unfocusedContainerColor = Color(0xFF222222),
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedIndicatorColor = Color(0xFFE53935),
+                        focusedIndicatorColor = MaterialTheme.colorScheme.primary,
                         unfocusedIndicatorColor = Color(0xFF444444)
                     )
                 )
@@ -406,7 +406,7 @@ private fun ColumnScope.CommentsTab(
                     Icon(
                         Icons.Default.Send,
                         contentDescription = "发送",
-                        tint = if (commentText.isNotBlank()) Color(0xFFE53935) else Color(0xFF666666)
+                        tint = if (commentText.isNotBlank()) MaterialTheme.colorScheme.primary else Color(0xFF666666)
                     )
                 }
             }
@@ -497,7 +497,7 @@ private fun CommentItem(
                 }
                 if (isOwnComment) {
                     TextButton(onClick = onDelete) {
-                        Text("删除", color = Color(0xFFE53935), fontSize = 12.sp)
+                        Text("删除", color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
                     }
                 }
             }
@@ -521,7 +521,7 @@ private fun CommentItem(
                     Icon(
                         if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         contentDescription = null,
-                        tint = if (liked) Color(0xFFE53935) else Color(0xFF888888)
+                        tint = if (liked) MaterialTheme.colorScheme.primary else Color(0xFF888888)
                     )
                 }
                 Text(

@@ -131,6 +131,43 @@
         <h4>待上传文件 ({{ pendingFiles.length }}个，合计 {{ formatFileSize(pendingTotalSize) }})</h4>
         <el-table :data="pendingFiles" style="width: 100%" max-height="300">
           <el-table-column prop="name" label="文件名" />
+          <el-table-column label="合唱歌手" width="300">
+            <template #default="scope">
+              <div class="chorus-selector">
+                <el-autocomplete
+                  v-model="scope.row.chorusKeyword"
+                  :fetch-suggestions="searchChorusArtists"
+                  placeholder="输入歌手名搜索并从下拉中选择（可不填）"
+                  @select="(item) => handleChorusSelect(scope.row, item)"
+                  clearable
+                  style="width: 100%"
+                >
+                  <template #default="{ item }">
+                    <div class="artist-suggestion">
+                      <span class="artist-name">{{ item.name }}</span>
+                      <span class="artist-stats">{{ item.albumCount }}专辑 {{ item.songCount }}歌曲</span>
+                    </div>
+                  </template>
+                </el-autocomplete>
+                <div
+                  v-if="scope.row.chorusArtists && scope.row.chorusArtists.length"
+                  class="chorus-tags"
+                >
+                  <span class="chorus-tags-label">已选合唱歌手：</span>
+                  <el-tag
+                    v-for="artist in scope.row.chorusArtists"
+                    :key="artist.id ?? artist.name"
+                    size="small"
+                    closable
+                    @close="removeChorusArtist(scope.row, artist)"
+                    class="chorus-tag-item"
+                  >
+                    {{ artist.name }}
+                  </el-tag>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column prop="size" label="大小" width="120">
             <template #default="scope">
               {{ formatFileSize(scope.row.size) }}
@@ -190,10 +227,14 @@ type Album = {
   artistId?: number
 }
 
+type ChorusArtist = { id?: number; name: string }
+
 type PendingFile = {
   file: File
   name: string
   size: number
+  chorusArtists: ChorusArtist[]
+  chorusKeyword?: string
 }
 
 const MAX_FILES_PER_BATCH = 100
@@ -327,9 +368,44 @@ const addFiles = (files: File[]) => {
     pendingFiles.value.push({
       file,
       name: file.name,
-      size: file.size
+      size: file.size,
+      chorusArtists: [],
+      chorusKeyword: ''
     })
   }
+}
+
+const searchChorusArtists = async (keyword: string, callback: (results: Artist[]) => void) => {
+  if (!keyword?.trim()) {
+    callback([])
+    return
+  }
+  try {
+    const res = await request.get('/music-metadata/artists/search', {
+      params: { keyword: keyword.trim(), limit: 20 }
+    })
+    callback(res || [])
+  } catch (e) {
+    console.error('搜索合唱歌手失败:', e)
+    callback([])
+  }
+}
+
+const handleChorusSelect = (row: PendingFile, item: Artist) => {
+  if (!row.chorusArtists) {
+    row.chorusArtists = []
+  }
+  const exists = row.chorusArtists.some(a => a.id === item.id || a.name === item.name)
+  if (!exists) {
+    row.chorusArtists.push({ id: item.id, name: item.name })
+  }
+  row.chorusKeyword = ''
+}
+
+const removeChorusArtist = (row: PendingFile, artist: ChorusArtist) => {
+  row.chorusArtists = row.chorusArtists.filter(
+    a => !(a.id === artist.id && a.name === artist.name)
+  )
 }
 
 // 移除文件
@@ -414,6 +490,11 @@ const uploadSingleFile = async (pendingFile: PendingFile, albumId: number, index
   const formData = new FormData()
   formData.append('file', pendingFile.file)
   formData.append('albumId', albumId.toString())
+  const chorusArtists = pendingFile.chorusArtists || []
+  for (const a of chorusArtists) {
+    if (a.id != null) formData.append('chorusArtistIds', String(a.id))
+    if (a.name) formData.append('chorusArtistNames', a.name)
+  }
   
   try {
     const response = await fetch('/api/upload/single', {
@@ -562,6 +643,30 @@ const formatFileSize = (size: number) => {
   font-weight: bold;
   color: #303133;
   margin-bottom: 10px;
+}
+
+.chorus-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.chorus-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.chorus-tags-label {
+  font-size: 12px;
+  color: #909399;
+  margin-right: 4px;
+}
+
+.chorus-tag-item {
+  margin-right: 4px;
+  margin-top: 2px;
 }
 </style>hint {
   font-size: 14px;

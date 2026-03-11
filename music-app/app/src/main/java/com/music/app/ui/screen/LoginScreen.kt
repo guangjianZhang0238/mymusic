@@ -87,7 +87,7 @@ fun LoginScreen(
             // 标题
             Text(
                 "音乐播放器",
-                color = Color(0xFFE53935),
+                color = MaterialTheme.colorScheme.primary,
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -105,14 +105,14 @@ fun LoginScreen(
                 onValueChange = { username = it },
                 label = { Text("用户名", color = Color(0xFFBDBDBD)) },
                 leadingIcon = {
-                    Icon(Icons.Default.Person, contentDescription = null, tint = Color(0xFFE53935))
+                    Icon(Icons.Default.Person, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFE53935),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = Color(0xFF666666),
-                    focusedLabelColor = Color(0xFFE53935),
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
                     unfocusedLabelColor = Color(0xFFBDBDBD),
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White
@@ -126,15 +126,15 @@ fun LoginScreen(
                 onValueChange = { password = it },
                 label = { Text("密码", color = Color(0xFFBDBDBD)) },
                 leadingIcon = {
-                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFE53935))
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFFE53935),
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = Color(0xFF666666),
-                    focusedLabelColor = Color(0xFFE53935),
+                    focusedLabelColor = MaterialTheme.colorScheme.primary,
                     unfocusedLabelColor = Color(0xFFBDBDBD),
                     focusedTextColor = Color.White,
                     unfocusedTextColor = Color.White
@@ -146,7 +146,7 @@ fun LoginScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     error,
-                    color = Color(0xFFE53935),
+                    color = MaterialTheme.colorScheme.error,
                     fontSize = 14.sp
                 )
             }
@@ -161,15 +161,16 @@ fun LoginScreen(
                     .height(48.dp),
                 enabled = !uiState.loginLoading && username.isNotBlank() && password.isNotBlank(),
                 colors = androidx.compose.material3.ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFE53935),
-                    disabledContainerColor = Color(0xFF666666)
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    disabledContainerColor = Color(0xFF666666),
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 if (uiState.loginLoading) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
                         strokeWidth = 2.dp,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
                     Text("登录", fontSize = 16.sp)

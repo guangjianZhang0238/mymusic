@@ -10,7 +10,12 @@ public interface FileUploadService {
     
     Map<String, Object> uploadFile(MultipartFile file, Long userId);
     
-    Map<String, Object> uploadFileWithAlbum(MultipartFile file, Long userId, Long albumId);
+    Map<String, Object> uploadFileWithAlbum(
+            MultipartFile file,
+            Long userId,
+            Long albumId,
+            List<Long> chorusArtistIds,
+            List<String> chorusArtistNames);
     
     Map<String, Object> uploadFiles(List<MultipartFile> files, Long userId);
     

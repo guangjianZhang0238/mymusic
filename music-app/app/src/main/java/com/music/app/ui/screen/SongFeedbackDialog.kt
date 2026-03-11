@@ -115,7 +115,7 @@ fun SongFeedbackDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = uiState.currentSong?.artistName ?: "",
+                            text = uiState.currentSong?.artistNames ?: uiState.currentSong?.artistName ?: "",
                             color = Color(0xFFBDBDBD),
                             fontSize = 14.sp
                         )

@@ -130,7 +130,7 @@ fun EqualizerDialog(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    "十段均衡器",
+                                    "效果器",
                                     color = themeColor,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 20.sp
@@ -169,7 +169,7 @@ fun EqualizerDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "启用均衡器",
+                                "启用效果器",
                                 color = themeColor,
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 14.sp
@@ -487,6 +487,62 @@ fun EqualizerDialog(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    // 升降调（独立模块）
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
+                        border = BorderStroke(1.dp, themeColor.copy(alpha = 0.2f))
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    "升降调（半音）",
+                                    color = themeColor,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 14.sp
+                                )
+                                val semitones = eq.pitchShiftSemitones
+                                val display = when {
+                                    semitones > 0 -> "+$semitones"
+                                    semitones < 0 -> semitones.toString()
+                                    else -> "0"
+                                }
+                                Text(
+                                    "$display 半音",
+                                    color = themeColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+
+                            Slider(
+                                value = eq.pitchShiftSemitones.toFloat(),
+                                onValueChange = { viewModel.updatePitchShift(it.toInt()) },
+                                valueRange = -12f..12f,
+                                steps = 24,
+                                enabled = eq.enabled,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = themeColor,
+                                    activeTrackColor = themeColor,
+                                    inactiveTrackColor = Color(0xFF333333)
+                                )
+                            )
+
+                            Text(
+                                text = "此配置独立于上面的所有模块，仅在开启效果器后生效，不会改变音量和频段等其他设置。",
+                                color = Color(0xFF888888),
+                                fontSize = 11.sp
+                            )
                         }
                     }
                 }

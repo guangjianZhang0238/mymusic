@@ -213,7 +213,7 @@ fun SearchScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(song.title, color = Color.White, fontWeight = FontWeight.SemiBold)
-                            Text(song.artistName ?: "未知歌手", color = Color(0xFFBDBDBD))
+                            Text(song.artistNames ?: song.artistName ?: "未知歌手", color = Color(0xFFBDBDBD))
                         }
                         // 添加播放图标
                         Icon(

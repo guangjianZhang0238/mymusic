@@ -19,6 +19,9 @@ public class AppSongVO {
     @Schema(description = "歌手名")
     private String artistName;
 
+    @Schema(description = "所有歌手名称（主+合作），以 / 分隔")
+    private String artistNames;
+
     @Schema(description = "专辑ID")
     private Long albumId;
 

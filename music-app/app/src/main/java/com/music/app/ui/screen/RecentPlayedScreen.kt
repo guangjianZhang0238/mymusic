@@ -122,7 +122,7 @@ private fun RecentPlayedItem(
                     maxLines = 1
                 )
                 Text(
-                    text = song.artistName ?: "未知歌手",
+                    text = song.artistNames ?: song.artistName ?: "未知歌手",
                     color = Color(0xFFAAAAAA),
                     fontSize = 14.sp,
                     maxLines = 1

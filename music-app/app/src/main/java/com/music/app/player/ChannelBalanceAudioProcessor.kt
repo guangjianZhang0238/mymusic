@@ -25,7 +25,9 @@ class ChannelBalanceAudioProcessor : BaseAudioProcessor() {
     }
 
     override fun isActive(): Boolean {
-        return super.isActive() && balance != 0f
+        // 始终保持处理器激活，由内部根据 balance 决定是否实际改变音量
+        // 避免因为 balance 从 0 变为非 0 时，ExoPlayer 未重新检查 isActive 导致效果仅在 seek 之后才生效
+        return super.isActive()
     }
 
     override fun queueInput(inputBuffer: ByteBuffer) {

@@ -32,3 +32,10 @@ export const updateAlbum = (data: any) => {
 export const deleteAlbum = (id: number) => {
   return request.delete(`/album/${id}`)
 }
+
+// 批量将歌曲收录到专辑中
+export const bindAlbumSongs = (albumId: number, songIds: number[]) => {
+  return request.post(`/album/${albumId}/songs/batch-bind`, {
+    songIds,
+  })
+}

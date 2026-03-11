@@ -1,9 +1,16 @@
 package com.music.file.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
+import com.music.api.dto.SongDTO;
+import com.music.api.vo.ArtistVO;
 import com.music.common.exception.BusinessException;
 import com.music.content.entity.Album;
+import com.music.content.entity.Artist;
+import com.music.content.entity.SongArtist;
+import com.music.content.mapper.ArtistMapper;
+import com.music.content.mapper.SongArtistMapper;
 import com.music.content.service.AlbumService;
+import com.music.content.service.SongService;
 import com.music.content.service.ArtistService;
 import com.music.file.config.StorageConfig;
 import com.music.file.service.FileUploadService;
@@ -18,9 +25,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -37,6 +46,15 @@ public class FileUploadServiceImpl implements FileUploadService {
 
     @Resource
     private MusicMetadataService musicMetadataService;
+
+    @Resource
+    private SongService songService;
+
+    @Resource
+    private SongArtistMapper songArtistMapper;
+
+    @Resource
+    private ArtistMapper artistMapper;
     
     @Override
     public Map<String, Object> uploadFile(MultipartFile file, Long userId) {
@@ -68,7 +86,12 @@ public class FileUploadServiceImpl implements FileUploadService {
     }
     
     @Override
-    public Map<String, Object> uploadFileWithAlbum(MultipartFile file, Long userId, Long albumId) {
+    public Map<String, Object> uploadFileWithAlbum(
+            MultipartFile file,
+            Long userId,
+            Long albumId,
+            List<Long> chorusArtistIds,
+            List<String> chorusArtistNames) {
         // 检查文件是否为空
         if (file.isEmpty()) {
             throw BusinessException.of("文件不能为空");
@@ -91,6 +114,12 @@ public class FileUploadServiceImpl implements FileUploadService {
         // 生成基于专辑的相对路径
         String relativePath = album.getFolderPath() + "/" + originalFilename;
         String filePath = saveFile(file, relativePath);
+        
+        // 合唱歌手：已有 ID 的直接使用，仅有名称的自动匹配或创建，得到最终 ID 列表
+        List<Long> resolvedChorusIds = resolveChorusArtistIds(chorusArtistIds, chorusArtistNames);
+
+        // 直接创建歌曲记录并建立歌手关联（无需 .artists.json）
+        createSongAndArtistLinks(album, relativePath, originalFilename, file.getSize(), extension, resolvedChorusIds);
         
         Map<String, Object> result = new HashMap<>();
         result.put("filename", originalFilename);
@@ -340,6 +369,119 @@ public class FileUploadServiceImpl implements FileUploadService {
         log.info("专辑封面上传成功(字节流)：albumId={}, folderPath={}, filePath={}", albumId, normalizedFolderPath, relativePath);
         return result;
     }
+    
+    /** 将合唱歌手 ID 列表与名称列表合并为最终 ID 列表，仅有名称的会 autoMatchOrCreate */
+    private List<Long> resolveChorusArtistIds(List<Long> chorusArtistIds, List<String> chorusArtistNames) {
+        List<Long> result = new ArrayList<>();
+        if (chorusArtistIds != null) {
+            for (Long id : chorusArtistIds) {
+                if (id != null && !result.contains(id)) result.add(id);
+            }
+        }
+        if (chorusArtistNames != null) {
+            for (String name : chorusArtistNames) {
+                if (name == null || name.trim().isEmpty()) continue;
+                try {
+                    ArtistVO a = musicMetadataService.autoMatchOrCreateArtist(name.trim());
+                    if (a != null && a.getId() != null && !result.contains(a.getId())) {
+                        result.add(a.getId());
+                        log.info("自动匹配/创建合唱歌手: name={}, id={}", a.getName(), a.getId());
+                    }
+                } catch (Exception e) {
+                    log.warn("合唱歌手匹配失败，跳过: name={}, error={}", name, e.getMessage());
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 上传时直接创建歌曲记录并建立主歌手与合唱歌手的关联
+     */
+    private void createSongAndArtistLinks(Album album, String relativePath, String fileName, long fileSize,
+                                          String format, List<Long> chorusArtistIds) {
+        try {
+            Long mainArtistId = album.getArtistId();
+            if (mainArtistId == null) {
+                log.warn("专辑无主歌手，跳过创建歌曲记录");
+                return;
+            }
+            String title = fileName;
+            int lastDot = fileName.lastIndexOf('.');
+            if (lastDot > 0) {
+                title = fileName.substring(0, lastDot);
+            }
+            SongDTO dto = new SongDTO();
+            dto.setAlbumId(album.getId());
+            dto.setArtistId(mainArtistId);
+            dto.setTitle(title);
+            dto.setTitleEn("");
+            dto.setFilePath(relativePath);
+            dto.setFileName(fileName);
+            dto.setFileSize(fileSize);
+            dto.setFormat(format);
+            dto.setDuration(0);
+            dto.setStatus(1);
+            Long songId = songService.create(dto);
+            if (songId == null) {
+                log.warn("创建歌曲记录失败: {}", relativePath);
+                return;
+            }
+            Artist mainArtist = artistMapper.selectById(mainArtistId);
+            if (mainArtist == null) {
+                log.warn("主歌手不存在: {}", mainArtistId);
+                return;
+            }
+            List<Long> chorusIds = chorusArtistIds != null ? chorusArtistIds : List.of();
+            linkArtistsForSong(songId, mainArtist, chorusIds);
+            log.info("已创建歌曲及歌手关联: songId={}, title={}, artists={}", songId, title,
+                    chorusIds.isEmpty() ? mainArtist.getName() : mainArtist.getName() + "+" + chorusIds.size() + "合唱");
+        } catch (Exception e) {
+            log.warn("创建歌曲记录失败，不影响文件上传: path={}, error={}", relativePath, e.getMessage());
+        }
+    }
+
+    private void linkArtistsForSong(Long songId, Artist mainArtist, List<Long> chorusArtistIds) {
+        try {
+            SongArtist main = new SongArtist();
+            main.setSongId(songId);
+            main.setArtistId(mainArtist.getId());
+            main.setSortOrder(0);
+            songArtistMapper.insert(main);
+            if (chorusArtistIds != null && !chorusArtistIds.isEmpty()) {
+                int order = 1;
+                for (Long id : chorusArtistIds) {
+                    if (id == null || Objects.equals(id, mainArtist.getId())) continue;
+                    SongArtist sa = new SongArtist();
+                    sa.setSongId(songId);
+                    sa.setArtistId(id);
+                    sa.setSortOrder(order++);
+                    songArtistMapper.insert(sa);
+                }
+            }
+            List<String> names = new ArrayList<>();
+            names.add(mainArtist.getName());
+            if (chorusArtistIds != null) {
+                for (Long id : chorusArtistIds) {
+                    if (id == null || Objects.equals(id, mainArtist.getId())) continue;
+                    Artist a = artistMapper.selectById(id);
+                    if (a != null && a.getName() != null && !a.getName().isEmpty()) {
+                        names.add(a.getName());
+                    }
+                }
+            }
+            if (names.size() > 1) {
+                com.music.content.entity.Song song = songService.getById(songId);
+                if (song != null) {
+                    song.setArtistNames(String.join(" / ", names));
+                    songService.updateById(song);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("写入歌手关联失败: songId={}, error={}", songId, e.getMessage());
+        }
+    }
+
     
     @Override
     public String saveFile(MultipartFile file, String relativePath) {

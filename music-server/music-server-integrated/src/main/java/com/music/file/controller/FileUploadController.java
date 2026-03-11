@@ -34,10 +34,12 @@ public class FileUploadController {
     public Result<Map<String, Object>> uploadFile(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "userId", required = false) Long userId,
-            @RequestParam(value = "albumId", required = false) Long albumId) {
+            @RequestParam(value = "albumId", required = false) Long albumId,
+            @RequestParam(value = "chorusArtistIds", required = false) List<Long> chorusArtistIds,
+            @RequestParam(value = "chorusArtistNames", required = false) List<String> chorusArtistNames) {
         
-        log.info("接收到文件上传请求: filename={}, size={}, contentType={}, userId={}, albumId={}", 
-                file.getOriginalFilename(), file.getSize(), file.getContentType(), userId, albumId);
+        log.info("接收到文件上传请求: filename={}, size={}, contentType={}, userId={}, albumId={}, chorusArtistIds={}, chorusArtistNames={}", 
+                file.getOriginalFilename(), file.getSize(), file.getContentType(), userId, albumId, chorusArtistIds, chorusArtistNames);
         
         // 文件完整性检查
         if (file.isEmpty()) {
@@ -66,9 +68,14 @@ public class FileUploadController {
         
         log.info("开始处理文件上传: filename={}, size={} bytes", file.getOriginalFilename(), file.getSize());
         
-        // 如果提供了albumId，使用专门的专辑上传方法
+        // 如果提供了albumId，使用专门的专辑上传方法，并透传可选的合唱歌手信息（支持多人）
         if (albumId != null) {
-            return Result.success(fileUploadService.uploadFileWithAlbum(file, userId, albumId));
+            return Result.success(fileUploadService.uploadFileWithAlbum(
+                    file,
+                    userId,
+                    albumId,
+                    chorusArtistIds != null ? chorusArtistIds : List.of(),
+                    chorusArtistNames != null ? chorusArtistNames : List.of()));
         }
         
         return Result.success(fileUploadService.uploadFile(file, userId));

@@ -404,7 +404,7 @@ private fun SongItem(
                     maxLines = 1
                 )
                 Text(
-                    text = song.artistName ?: "未知艺术家",
+                    text = song.artistNames ?: song.artistName ?: "未知艺术家",
                     color = Color(0xFFBBBBBB),
                     fontSize = 12.sp,
                     maxLines = 1

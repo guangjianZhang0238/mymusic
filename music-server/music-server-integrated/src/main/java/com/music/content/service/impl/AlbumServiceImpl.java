@@ -7,9 +7,11 @@ import com.music.api.dto.AlbumDTO;
 import com.music.api.vo.AlbumVO;
 import com.music.common.exception.BusinessException;
 import com.music.content.entity.Album;
+import com.music.content.entity.AlbumSong;
 import com.music.content.entity.Artist;
 import com.music.content.entity.Song;
 import com.music.content.mapper.AlbumMapper;
+import com.music.content.mapper.AlbumSongMapper;
 import com.music.content.mapper.ArtistMapper;
 import com.music.content.mapper.SongMapper;
 import com.music.content.service.AlbumService;
@@ -24,6 +26,7 @@ public class AlbumServiceImpl extends ServiceImpl<AlbumMapper, Album> implements
     
     private final ArtistMapper artistMapper;
     private final SongMapper songMapper;
+    private final AlbumSongMapper albumSongMapper;
     
     @Override
     public Page<AlbumVO> pageList(String keyword, Long artistId, int current, int size) {
@@ -51,9 +54,8 @@ public class AlbumServiceImpl extends ServiceImpl<AlbumMapper, Album> implements
                 vo.setArtistName(artist.getName());
             }
             
-            Long songCount = songMapper.selectCount(new LambdaQueryWrapper<Song>()
-                    .eq(Song::getAlbumId, album.getId()));
-            vo.setSongCount(songCount.intValue());
+            int songCount = countSongsInAlbum(album.getId());
+            vo.setSongCount(songCount);
             
             return vo;
         }).toList());
@@ -76,9 +78,8 @@ public class AlbumServiceImpl extends ServiceImpl<AlbumMapper, Album> implements
             vo.setArtistName(artist.getName());
         }
         
-        Long songCount = songMapper.selectCount(new LambdaQueryWrapper<Song>()
-                .eq(Song::getAlbumId, id));
-        vo.setSongCount(songCount.intValue());
+        int songCount = countSongsInAlbum(id);
+        vo.setSongCount(songCount);
         
         return vo;
     }
@@ -136,12 +137,89 @@ public class AlbumServiceImpl extends ServiceImpl<AlbumMapper, Album> implements
     
     @Override
     public void delete(Long id) {
-        Long songCount = songMapper.selectCount(new LambdaQueryWrapper<Song>()
-                .eq(Song::getAlbumId, id));
+        int songCount = countSongsInAlbum(id);
         if (songCount > 0) {
             throw BusinessException.of("该专辑下存在歌曲，无法删除");
         }
         
         removeById(id);
+    }
+
+    @Override
+    public void bindSongs(Long albumId, java.util.List<Long> songIds) {
+        if (albumId == null) {
+            throw BusinessException.of("专辑ID不能为空");
+        }
+        if (songIds == null || songIds.isEmpty()) {
+            return;
+        }
+
+        Album album = getById(albumId);
+        if (album == null) {
+            throw BusinessException.of("专辑不存在");
+        }
+
+        // 查询已存在的关联，避免重复插入
+        java.util.List<AlbumSong> existingLinks = albumSongMapper.selectList(
+                new LambdaQueryWrapper<AlbumSong>()
+                        .eq(AlbumSong::getAlbumId, albumId)
+                        .in(AlbumSong::getSongId, songIds)
+        );
+        java.util.Set<Long> existingSongIds = new java.util.HashSet<>();
+        for (AlbumSong link : existingLinks) {
+            if (link.getSongId() != null) {
+                existingSongIds.add(link.getSongId());
+            }
+        }
+
+        // 为新收录的歌曲生成连续的 sortOrder
+        Long count = albumSongMapper.selectCount(
+                new LambdaQueryWrapper<AlbumSong>().eq(AlbumSong::getAlbumId, albumId)
+        );
+        int baseOrder = count != null ? count.intValue() : 0;
+        int offset = 0;
+
+        for (Long songId : songIds) {
+            if (songId == null || existingSongIds.contains(songId)) {
+                continue;
+            }
+
+            AlbumSong link = new AlbumSong();
+            link.setAlbumId(albumId);
+            link.setSongId(songId);
+            link.setSortOrder(baseOrder + offset);
+            offset++;
+            albumSongMapper.insert(link);
+        }
+    }
+
+    /**
+     * 统计专辑下的歌曲数量（兼容旧的 content_song.album_id 字段和新的 content_album_song 多对多关联）
+     */
+    private int countSongsInAlbum(Long albumId) {
+        if (albumId == null) {
+            return 0;
+        }
+        java.util.Set<Long> songIds = new java.util.HashSet<>();
+
+        // 旧模型：直接挂在 content_song.album_id 下的歌曲
+        songMapper.selectList(new LambdaQueryWrapper<Song>()
+                        .eq(Song::getAlbumId, albumId))
+                .forEach(song -> {
+                    if (song.getId() != null) {
+                        songIds.add(song.getId());
+                    }
+                });
+
+        // 新模型：content_album_song 多对多关联的歌曲
+        albumSongMapper.selectList(new LambdaQueryWrapper<AlbumSong>()
+                        .eq(AlbumSong::getAlbumId, albumId))
+                .forEach(link -> {
+                    if (link.getSongId() != null) {
+                        songIds.add(link.getSongId());
+                    }
+                });
+
+        return songIds.size();
     }
 }

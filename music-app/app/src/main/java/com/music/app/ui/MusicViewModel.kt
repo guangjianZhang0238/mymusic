@@ -144,6 +144,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun observePlayer() {
         viewModelScope.launch {
+            var lastSongId: Long? = null
+            var handledEndForSong = false
             while (true) {
                 try {
                     playerController.syncProgress()
@@ -155,6 +157,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                     // 只有当值真正改变时才更新UI状态，减少不必要的重组
                     val currentState = _uiState.value
+                    
+                    // 当歌曲变化时，重置「已处理结尾」标记
+                    if (song?.id != lastSongId) {
+                        lastSongId = song?.id
+                        handledEndForSong = false
+                    }
+                    
                     if (currentState.currentSong != song ||
                         currentState.isPlaying != isPlaying ||
                         currentState.playMode != playMode ||
@@ -174,6 +183,20 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             durationMs = duration,
                             currentLyricIndex = lyricIndex
                         )
+                    }
+
+                    // 自动切到下一首：当前歌曲自然播放结束时，复用现有的切歌逻辑
+                    val shouldAutoNext =
+                        song != null &&
+                        !isPlaying &&
+                        duration > 0 &&
+                        progress >= (duration - 1000L).coerceAtLeast(0L) &&
+                        !handledEndForSong &&
+                        playMode != PlayMode.LOOP_ONE
+
+                    if (shouldAutoNext) {
+                        handledEndForSong = true
+                        nextSong()
                     }
 
                     // 当歌曲改变时，自动加载歌词
@@ -200,7 +223,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             
             // 智能去重：同一歌手最多保留一首歌曲
             val uniqueSongs = songs
-                .distinctBy { it.artistName }
+                .distinctBy { it.artistNames ?: it.artistName }
                 .take(20)
                 
             Log.d("MusicViewModel", "获取到热门歌曲数量: ${uniqueSongs.size}")
@@ -634,7 +657,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         .sortedBy { it.settingKey }
                         .mapNotNull { it.settingValue.toFloatOrNull() }
                         .take(10)
-                        .let { if (it.size < 10) it + List(10 - it.size) { 0f } else it }
+                        .let { if (it.size < 10) it + List(10 - it.size) { 0f } else it },
+                    pitchShiftSemitones = settingsList.find { it.settingKey == "equalizer_pitch_semitones" }
+                        ?.settingValue
+                        ?.toIntOrNull()
+                        ?: 0
                 )
             )
             _userSettings.value = settings
@@ -661,6 +688,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 eq.preset?.let { repository.saveUserSetting("equalizer_preset", it) }
                 repository.saveUserSetting("equalizer_master_gain", eq.masterGainDb.toString())
                 repository.saveUserSetting("equalizer_stereo_balance", eq.stereoBalance.toString())
+                repository.saveUserSetting("equalizer_pitch_semitones", eq.pitchShiftSemitones.toString())
                 eq.bandGainsDb.forEachIndexed { index, gain ->
                     repository.saveUserSetting("equalizer_band_$index", gain.toString())
                 }
@@ -728,11 +756,23 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         
         // 应用声道平衡设置
         playerController.applyChannelBalance(eqSettings.stereoBalance ?: 0f)
+        
+        // 应用升降调（仅在效果器启用时生效）
+        val pitchSemitones = if (eqSettings.enabled) eqSettings.pitchShiftSemitones else 0
+        playerController.applyPitchShift(pitchSemitones)
     }
     
     fun updateStereoBalance(balance: Float) {
         val currentSettings = _userSettings.value
         val newEqSettings = currentSettings.equalizer?.copy(stereoBalance = balance) ?: EqualizerSettings(stereoBalance = balance)
+        updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
+    }
+
+    fun updatePitchShift(semitones: Int) {
+        val clamped = semitones.coerceIn(-12, 12)
+        val currentSettings = _userSettings.value
+        val currentEq = currentSettings.equalizer ?: EqualizerSettings()
+        val newEqSettings = currentEq.copy(pitchShiftSemitones = clamped)
         updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
     }
 
@@ -1251,8 +1291,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         return isLoggedIn
     }
 
-    fun setThemeColor(color: androidx.compose.ui.graphics.Color) {
-        // 主题颜色设置（简化实现）
+    fun setThemeColor(
+        color: androidx.compose.ui.graphics.Color,
+        backgroundColor: androidx.compose.ui.graphics.Color? = null
+    ) {
+        val currentSettings = _userSettings.value
+        _userSettings.value = currentSettings.copy(
+            themeColor = color,
+            backgroundColor = backgroundColor ?: currentSettings.backgroundColor
+        )
     }
 
     fun submitSongFeedback(songId: Long, type: String, content: String, contact: String?) {

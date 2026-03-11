@@ -58,6 +58,8 @@ export interface SongVO {
   albumName: string
   artistId: number
   artistName: string
+  /** 所有歌手名称（主+合作），以 / 分隔，用于合唱展示 */
+  artistNames?: string
   title: string
   titleEn: string
   filePath: string

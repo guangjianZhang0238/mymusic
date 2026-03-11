@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.cache.CacheDataSource
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.OkHttpClient
 import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlin.math.pow
 
 enum class PlayMode {
     SEQUENCE,   // 顺序播放
@@ -388,6 +390,17 @@ class PlayerController(private val context: Context) {
 
     fun applyChannelBalance(balance: Float) {
         channelBalanceProcessor.balance = balance.coerceIn(-1f, 1f)
+    }
+
+    fun applyPitchShift(semitones: Int) {
+        val clamped = semitones.coerceIn(-12, 12)
+        val pitch = 2.0.pow(clamped / 12.0).toFloat()
+        val currentParams = player.playbackParameters
+        val newParams = PlaybackParameters(
+            /* speed = */ currentParams.speed,
+            /* pitch = */ pitch
+        )
+        player.playbackParameters = newParams
     }
 
     fun release() {

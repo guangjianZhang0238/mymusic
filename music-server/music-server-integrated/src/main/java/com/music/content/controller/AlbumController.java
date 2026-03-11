@@ -2,6 +2,7 @@ package com.music.content.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.music.api.dto.AlbumDTO;
+import com.music.api.dto.AlbumSongBindDTO;
 import com.music.api.vo.AlbumVO;
 import com.music.common.core.domain.Result;
 import com.music.content.service.AlbumService;
@@ -52,6 +53,14 @@ public class AlbumController {
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {
         albumService.delete(id);
+        return Result.success();
+    }
+
+    @Operation(summary = "批量将歌曲收录到专辑中")
+    @PostMapping("/{albumId}/songs/batch-bind")
+    public Result<Void> bindSongs(@PathVariable Long albumId,
+                                  @RequestBody AlbumSongBindDTO dto) {
+        albumService.bindSongs(albumId, dto != null ? dto.getSongIds() : null);
         return Result.success();
     }
 }

@@ -134,7 +134,7 @@ fun ArtistDetailScreen(
                         SongListItem(
                             index = index + 1,
                             title = song.title,
-                            artist = song.artistName ?: "未知歌手",
+                            artist = song.artistNames ?: song.artistName ?: "未知歌手",
                             playCount = song.playCount,
                             onClick = { 
                                 // 单曲点击：添加到播放列表（不替换）

@@ -41,9 +41,9 @@
                   {{ formatName(songScope.row.title, songScope.row.titleEn) }}
                 </template>
               </el-table-column>
-              <el-table-column label="歌手" width="120" show-overflow-tooltip>
+              <el-table-column label="歌手" width="160" show-overflow-tooltip>
                 <template #default="songScope">
-                  {{ formatName(songScope.row.artistName, songScope.row.artistNameEn) }}
+                  {{ songScope.row.artistNames || formatName(songScope.row.artistName, songScope.row.artistNameEn) }}
                 </template>
               </el-table-column>
               <el-table-column prop="durationFormat" label="时长" width="84" />
@@ -104,10 +104,18 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="320" fixed="right">
         <template #default="scope">
           <el-button size="small" @click="handleEditAlbum(scope.row)">
             编辑
+          </el-button>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            @click.stop="openBindSongsDialog(scope.row)"
+          >
+            收录歌曲
           </el-button>
           <el-button
             size="small"
@@ -202,6 +210,66 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 专辑收录歌曲对话框 -->
+    <el-dialog
+      v-model="bindDialogVisible"
+      :title="`收录歌曲 - ${currentAlbumForBind ? formatName(currentAlbumForBind.name, currentAlbumForBind.nameEn) : ''}`"
+      width="880px"
+    >
+      <div class="bind-dialog-header">
+        <el-input
+          v-model="bindSongSearchKeyword"
+          placeholder="搜索歌曲（歌曲名 / 拼音）"
+          style="width: 320px; margin-right: 12px"
+          clearable
+          @keyup.enter="loadCandidateSongs"
+        >
+          <template #append>
+            <el-button @click="loadCandidateSongs">
+              <el-icon><Search /></el-icon>
+            </el-button>
+          </template>
+        </el-input>
+        <span class="bind-dialog-tip">
+          已选中 {{ bindSelectedSongIds.length }} 首歌曲，点击“确定收录”将它们加入当前专辑
+        </span>
+      </div>
+      <el-table
+        v-loading="bindSongLoading"
+        :data="bindSongList"
+        border
+        height="420px"
+        row-key="id"
+        @selection-change="handleBindSelectionChange"
+      >
+        <el-table-column type="selection" width="50" />
+        <el-table-column label="歌曲名称" min-width="220" show-overflow-tooltip>
+          <template #default="scope">
+            {{ formatName(scope.row.title, scope.row.titleEn) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="歌手" min-width="180" show-overflow-tooltip>
+          <template #default="scope">
+            {{ scope.row.artistNames || formatName(scope.row.artistName, scope.row.artistNameEn) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="durationFormat" label="时长" width="90" />
+        <el-table-column label="歌词" width="90">
+          <template #default="scope">
+            <el-tag size="small" :type="scope.row.hasLyrics ? 'success' : 'info'">
+              {{ scope.row.hasLyrics ? '已同步' : '无歌词' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="bindDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmBindSongs">确定收录</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -246,6 +314,14 @@ const albumForm = reactive({
   description: '',
   folderPath: ''
 })
+
+// 收录歌曲对话框相关状态
+const bindDialogVisible = ref(false)
+const currentAlbumForBind = ref<any | null>(null)
+const bindSongSearchKeyword = ref('')
+const bindSongList = ref<any[]>([])
+const bindSelectedSongIds = ref<number[]>([])
+const bindSongLoading = ref(false)
 
 const albumRules = {
   name: [
@@ -440,6 +516,76 @@ const handleStatusChange = async (album: any) => {
   } catch (error) {
     album.status = album.status === 1 ? 0 : 1
     ElMessage.error('状态更新失败')
+  }
+}
+
+// 打开收录歌曲对话框
+const openBindSongsDialog = (album: any) => {
+  if (!album?.id) return
+  currentAlbumForBind.value = album
+  bindSongSearchKeyword.value = ''
+  bindSelectedSongIds.value = []
+  loadCandidateSongs()
+  bindDialogVisible.value = true
+}
+
+// 加载可选歌曲列表
+const loadCandidateSongs = async () => {
+  bindSongLoading.value = true
+  try {
+    const response = await songApi.getSongList({
+      current: 1,
+      size: 200,
+      keyword: bindSongSearchKeyword.value || undefined
+    })
+
+    const records = response.records || []
+
+    // 可选：过滤掉已经在当前专辑里的歌曲，避免重复展示
+    const albumId = currentAlbumForBind.value?.id
+    const existingSongIds = albumId && albumSongsMap[albumId]
+      ? new Set((albumSongsMap[albumId] || []).map((s: any) => s.id))
+      : new Set<number>()
+
+    bindSongList.value = records.filter((song: any) => {
+      if (!song?.id) return false
+      return !existingSongIds.has(song.id)
+    })
+  } catch (error: any) {
+    ElMessage.error(error.message || '加载候选歌曲失败')
+  } finally {
+    bindSongLoading.value = false
+  }
+}
+
+// 勾选变化
+const handleBindSelectionChange = (selection: any[]) => {
+  bindSelectedSongIds.value = selection
+    .map((item: any) => item.id)
+    .filter((id: any) => typeof id === 'number')
+}
+
+// 提交收录
+const confirmBindSongs = async () => {
+  const album = currentAlbumForBind.value
+  if (!album?.id) {
+    ElMessage.error('专辑信息无效')
+    return
+  }
+  if (!bindSelectedSongIds.value.length) {
+    ElMessage.warning('请先选择要收录的歌曲')
+    return
+  }
+
+  try {
+    await albumApi.bindAlbumSongs(album.id, bindSelectedSongIds.value)
+    ElMessage.success('收录成功')
+    bindDialogVisible.value = false
+    // 刷新该专辑下的歌曲列表和专辑统计
+    await loadAlbumSongs(album.id, true)
+    await loadAlbums()
+  } catch (error: any) {
+    ElMessage.error(error.message || '收录歌曲失败')
   }
 }
 

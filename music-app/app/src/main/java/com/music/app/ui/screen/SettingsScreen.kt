@@ -36,6 +36,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -68,12 +69,10 @@ fun SettingsScreen(
     var showClearMusicCacheDialog by remember { mutableStateOf(false) }
     var showClearAccountCacheDialog by remember { mutableStateOf(false) }
     var currentCacheSize by remember { mutableStateOf("0 MB") }
-    
-    // 背景设置相关状态
-    var showBackgroundPicker by remember { mutableStateOf(false) }
+
     var showThemeColorPicker by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
-    
+
     // 计算缓存大小
     currentCacheSize = viewModel.getCacheSize()
     
@@ -83,7 +82,7 @@ fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF111111))
+            .background(viewModel.userSettings.value.backgroundColor ?: Color(0xFF111111))
             .verticalScroll(rememberScrollState())
     ) {
         // 顶部导航栏
@@ -111,77 +110,8 @@ fun SettingsScreen(
         }
         
         Spacer(Modifier.height(16.dp))
-        
-        // 背景设置
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Wallpaper,
-                        contentDescription = null,
-                        tint = Color(0xFFE53935),
-                        modifier = Modifier.padding(end = 12.dp)
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "背景设置",
-                            color = Color.White,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            "自定义应用背景主题",
-                            color = Color(0xFFBDBDBD),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                    Button(
-                        onClick = { showBackgroundPicker = true },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE53935)
-                        )
-                    ) {
-                        Text("选择", color = Color.White)
-                    }
-                }
-                
-                // 当前背景预览
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "当前背景预览：",
-                    color = Color(0xFFBDBDBD),
-                    fontSize = 14.sp
-                )
-                Spacer(Modifier.height(8.dp))
-                
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                        .background(viewModel.userSettings.value.backgroundColor ?: Color(0xFF111111))
-                        .padding(8.dp)
-                ) {
-                    Text(
-                        "预览区域",
-                        color = Color.White,
-                        fontSize = 16.sp
-                    )
-                }
-            }
-        }
-        
-        Spacer(Modifier.height(16.dp))
 
-        // 主题颜色设置
+        // 主题颜色设置（同时控制主题色和背景色）
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -196,7 +126,7 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.Palette,
                         contentDescription = null,
-                        tint = Color(0xFFE53935),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -207,7 +137,7 @@ fun SettingsScreen(
                             fontSize = 16.sp
                         )
                         Text(
-                            "选择应用的主要主题颜色，将应用于所有界面元素",
+                            "选择应用的主题风格，将同时影响主色调和背景色",
                             color = Color(0xFFBDBDBD),
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 4.dp)
@@ -216,10 +146,11 @@ fun SettingsScreen(
                     Button(
                         onClick = { showThemeColorPicker = true },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = viewModel.userSettings.value.themeColor
+                            containerColor = viewModel.userSettings.value.themeColor,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
-                        Text("选择", color = Color.White)
+                        Text("选择")
                     }
                 }
                 
@@ -283,18 +214,18 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.Tune,
                         contentDescription = null,
-                        tint = Color(0xFFE53935),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            "音效均衡器",
+                            "音效效果器",
                             color = Color.White,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 16.sp
                         )
                         Text(
-                            "十段均衡器，实时作用于当前播放音乐",
+                            "效果器，实时作用于当前播放音乐",
                             color = Color(0xFFBDBDBD),
                             fontSize = 12.sp,
                             modifier = Modifier.padding(top = 4.dp)
@@ -306,9 +237,12 @@ fun SettingsScreen(
                                 showEqualizerDialog = true
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
                     ) {
-                        Text("打开", color = Color.White)
+                        Text("打开")
                     }
                 }
             }
@@ -332,7 +266,7 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.MusicNote,
                         contentDescription = null,
-                        tint = Color(0xFFE53935),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Text(
@@ -406,16 +340,16 @@ fun SettingsScreen(
                     Button(
                         onClick = { showClearMusicCacheDialog = true },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFE53935)
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = null,
-                            tint = Color.White,
                             modifier = Modifier.size(16.dp).padding(end = 4.dp)
                         )
-                        Text("清除歌曲缓存", color = Color.White)
+                        Text("清除歌曲缓存")
                     }
                 }
                 
@@ -449,7 +383,7 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.AccountCircle,
                         contentDescription = null,
-                        tint = Color(0xFFE53935),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Text(
@@ -531,7 +465,7 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.Feedback,
                         contentDescription = null,
-                        tint = Color(0xFFE53935),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column(modifier = Modifier.weight(1f)) {
@@ -575,7 +509,7 @@ fun SettingsScreen(
                     Icon(
                         Icons.Default.Info,
                         contentDescription = null,
-                        tint = Color(0xFFE53935),
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(end = 12.dp)
                     )
                     Column {
@@ -599,17 +533,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
     }
     
-    // 背景选择对话框
-    if (showBackgroundPicker) {
-        BackgroundPickerDialog(
-            currentBackgroundColor = viewModel.userSettings.value.backgroundColor ?: Color(0xFF111111),
-            onBackgroundSelected = { color ->
-                viewModel.updateUserSettings(viewModel.userSettings.value.copy(backgroundColor = color))
-                showBackgroundPicker = false
-            },
-            onDismiss = { showBackgroundPicker = false }
-        )
-    }
+    // 背景选择器已集成到主题颜色选择器中
     
     if (showEqualizerDialog) {
         EqualizerDialog(
@@ -632,10 +556,11 @@ fun SettingsScreen(
                         showClearMusicCacheDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFE53935)
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text("确认清除", color = Color.White)
+                    Text("确认清除")
                 }
             },
             dismissButton = {
@@ -677,8 +602,8 @@ fun SettingsScreen(
     if (showThemeColorPicker) {
         ThemeColorPickerDialog(
             currentThemeColor = viewModel.userSettings.value.themeColor,
-            onThemeColorSelected = { color ->
-                viewModel.setThemeColor(color)
+            onThemeColorSelected = { themeColor, backgroundColor ->
+                viewModel.setThemeColor(themeColor, backgroundColor)
                 showThemeColorPicker = false
             },
             onDismiss = { showThemeColorPicker = false }
@@ -689,18 +614,61 @@ fun SettingsScreen(
 @Composable
 private fun ThemeColorPickerDialog(
     currentThemeColor: Color,
-    onThemeColorSelected: (Color) -> Unit,
+    onThemeColorSelected: (Color, Color) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // 主题预设：同时指定主题主色与推荐背景色，保证文字对比度
+    data class ThemeOption(val name: String, val primary: Color, val background: Color)
+
     val themeOptions = listOf(
-        "经典红" to Color(0xFFE53935),
-        "活力橙" to Color(0xFFFF6D00),
-        "阳光黄" to Color(0xFFFFD600),
-        "清新绿" to Color(0xFF00C853),
-        "海洋蓝" to Color(0xFF2979FF),
-        "优雅紫" to Color(0xFFAA00FF),
-        "浪漫粉" to Color(0xFFFF4081),
-        "薄荷绿" to Color(0xFF1DE9B6)
+        // 网易云风（默认红）：深色背景 + 高对比主色
+        ThemeOption(
+            name = "网易云红（经典）",
+            primary = Color(0xFFE53935),
+            background = Color(0xFF111111)
+        ),
+        // 少女粉色可爱风：偏紫深色背景，避免刺眼又保证对比
+        ThemeOption(
+            name = "少女粉色可爱风",
+            primary = Color(0xFFFF80AB),
+            background = Color(0xFF241424)
+        ),
+        // 科技风：偏青蓝的高对比颜色 + 深蓝背景
+        ThemeOption(
+            name = "科技蓝绿色",
+            primary = Color(0xFF00E5FF),
+            background = Color(0xFF021018)
+        ),
+        // 务实风：低调耐看的蓝灰色 + 深灰背景
+        ThemeOption(
+            name = "务实蓝灰风",
+            primary = Color(0xFF607D8B),
+            background = Color(0xFF101820)
+        ),
+        // 文艺风：温暖的棕色调 + 深咖背景
+        ThemeOption(
+            name = "文艺暖棕风",
+            primary = Color(0xFF8D6E63),
+            background = Color(0xFF1A120F)
+        ),
+        // 紫色少女风：亮紫主色 + 深紫背景
+        ThemeOption(
+            name = "紫色少女风",
+            primary = Color(0xFFE040FB),
+            background = Color(0xFF1A0820)
+        ),
+        // 极简黑白风：主色用接近白的浅灰，配合纯深色背景
+        ThemeOption(
+            name = "极简黑白风",
+            primary = Color(0xFFFAFAFA),
+            background = Color(0xFF000000)
+        ),
+        // 森林温暖风：森林系的偏暖绿色 + 深绿色背景
+        ThemeOption(
+            name = "森林温暖风",
+            primary = Color(0xFF4CAF50),
+            background = Color(0xFF021507)
+        )
     )
     
     AlertDialog(
@@ -715,30 +683,30 @@ private fun ThemeColorPickerDialog(
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                themeOptions.chunked(4).forEach { rowColors ->
+                themeOptions.chunked(4).forEach { rowOptions ->
                     Row(
                         horizontalArrangement = Arrangement.SpaceEvenly,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        rowColors.forEach { (name, color) ->
+                        rowOptions.forEach { option ->
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clickable { 
-                                        onThemeColorSelected(color)
+                                    .clickable {
+                                        onThemeColorSelected(option.primary, option.background)
                                     }
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .size(50.dp)
                                         .background(
-                                            color = color,
+                                            color = option.primary,
                                             shape = RoundedCornerShape(25.dp)
                                         )
                                         .padding(4.dp)
                                 ) {
-                                    if (color == currentThemeColor) {
+                                    if (option.primary == currentThemeColor) {
                                         Icon(
                                             Icons.Default.Check,
                                             contentDescription = null,
@@ -749,7 +717,7 @@ private fun ThemeColorPickerDialog(
                                 }
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    text = name,
+                                    text = option.name,
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     maxLines = 1
@@ -757,7 +725,7 @@ private fun ThemeColorPickerDialog(
                             }
                         }
                         // 如果这行不足4个，填充空白
-                        repeat(4 - rowColors.size) {
+                        repeat(4 - rowOptions.size) {
                             Spacer(Modifier.weight(1f))
                         }
                     }

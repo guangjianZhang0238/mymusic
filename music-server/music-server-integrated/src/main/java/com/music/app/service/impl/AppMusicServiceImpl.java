@@ -15,8 +15,10 @@ import com.music.common.utils.PinyinUtils;
 import com.music.content.entity.Album;
 import com.music.content.entity.Artist;
 import com.music.content.entity.Song;
+import com.music.content.entity.SongArtist;
 import com.music.content.mapper.AlbumMapper;
 import com.music.content.mapper.ArtistMapper;
+import com.music.content.mapper.SongArtistMapper;
 import com.music.content.mapper.SongMapper;
 import com.music.content.service.AlbumService;
 import com.music.content.service.ArtistService;
@@ -39,6 +41,7 @@ public class AppMusicServiceImpl implements AppMusicService {
     private final ArtistMapper artistMapper;
     private final AlbumMapper albumMapper;
     private final SongMapper songMapper;
+    private final SongArtistMapper songArtistMapper;
 
     @Override
     public Page<AppSongVO> pageSongs(Integer current, Integer size, String keyword, Long albumId, Long artistId) {
@@ -98,11 +101,19 @@ public class AppMusicServiceImpl implements AppMusicService {
         vo.setFilePath(song.getFilePath());
         vo.setHasLyrics(song.getHasLyrics());
 
-        // 获取歌手名称
+        // 获取歌手名称（主唱 + 合唱歌手）
         if (song.getArtistId() != null) {
             Artist artist = artistMapper.selectById(song.getArtistId());
             if (artist != null) {
                 vo.setArtistName(artist.getName());
+            }
+        }
+        if (song.getArtistNames() != null && !song.getArtistNames().isEmpty()) {
+            vo.setArtistNames(song.getArtistNames());
+        } else if (song.getArtistId() != null) {
+            Artist artist = artistMapper.selectById(song.getArtistId());
+            if (artist != null) {
+                vo.setArtistNames(artist.getName());
             }
         }
 
@@ -161,11 +172,18 @@ public class AppMusicServiceImpl implements AppMusicService {
     @Override
     public List<AppSongVO> getArtistTopSongs(Long artistId, int limit) {
         if (artistId == null) return new ArrayList<>();
+        LambdaQueryWrapper<SongArtist> saWrapper = new LambdaQueryWrapper<>();
+        saWrapper.eq(SongArtist::getArtistId, artistId);
+        List<Long> songIdsFromLink = songArtistMapper.selectList(saWrapper).stream()
+                .map(SongArtist::getSongId).distinct().toList();
         LambdaQueryWrapper<Song> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Song::getArtistId, artistId)
-               .eq(Song::getStatus, 1)
-               .orderByDesc(Song::getPlayCount)
-               .last("LIMIT " + Math.min(limit, 50));
+        wrapper.eq(Song::getStatus, 1);
+        if (songIdsFromLink.isEmpty()) {
+            wrapper.eq(Song::getArtistId, artistId);
+        } else {
+            wrapper.and(w -> w.eq(Song::getArtistId, artistId).or().in(Song::getId, songIdsFromLink));
+        }
+        wrapper.orderByDesc(Song::getPlayCount).last("LIMIT " + Math.min(limit, 50));
         List<Song> songs = songMapper.selectList(wrapper);
         return songs.stream().map(song -> {
             SongVO vo = songService.getDetail(song.getId());

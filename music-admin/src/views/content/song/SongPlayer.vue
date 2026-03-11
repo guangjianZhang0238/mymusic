@@ -17,7 +17,7 @@
         </div>
         <div class="song-info">
           <h3 class="song-title">{{ song.title }}</h3>
-          <p class="song-artist">{{ song.artistName }}</p>
+          <p class="song-artist">{{ song.artistNames || song.artistName }}</p>
           <p class="song-album">{{ song.albumName }}</p>
           <div class="song-actions">
             <el-button type="primary" @click="handleLike" :icon="isLiked ? 'Star' : 'StarFilled'">
@@ -566,7 +566,7 @@ const loadLyrics = async () => {
     } else {
       lyrics.value = [
         '暂无歌词',
-        '演唱：' + props.song.artistName
+        '演唱：' + (props.song.artistNames || props.song.artistName)
       ]
       parsedLyrics.value = lyrics.value.map((line, index) => ({
         time: index * 5,
@@ -577,7 +577,7 @@ const loadLyrics = async () => {
     console.error('获取歌词失败:', error)
     lyrics.value = [
       '暂无歌词',
-      '演唱：' + props.song.artistName
+      '演唱：' + (props.song.artistNames || props.song.artistName)
     ]
     parsedLyrics.value = lyrics.value.map((line, index) => ({
       time: index * 5,

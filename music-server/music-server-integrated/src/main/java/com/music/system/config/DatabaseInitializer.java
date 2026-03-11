@@ -26,6 +26,7 @@ public class DatabaseInitializer implements ApplicationRunner {
             createAlbumTable();
             createSongTable();
             createSongArtistTable(); // 添加歌曲歌手关联表
+            createAlbumSongTable(); // 添加专辑歌曲关联表，支持一首歌被多个专辑收录
             createLyricsTable();
             createPlaylistTable();
             createPlaylistSongTable();
@@ -270,6 +271,30 @@ public class DatabaseInitializer implements ApplicationRunner {
             """;
         jdbcTemplate.execute(sql);
         log.info("歌曲歌手关联表创建成功");
+    }
+
+    /**
+     * 创建专辑-歌曲多对多关联表，用于支持一首歌被多个专辑收录
+     */
+    private void createAlbumSongTable() {
+        String sql = """
+            CREATE TABLE IF NOT EXISTS content_album_song (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '主键ID',
+                album_id BIGINT NOT NULL COMMENT '专辑ID',
+                song_id BIGINT NOT NULL COMMENT '歌曲ID',
+                track_number INT COMMENT '曲目序号',
+                disc_number INT COMMENT '光盘号',
+                sort_order INT COMMENT '排序序号',
+                create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+                update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+                deleted INT DEFAULT 0 COMMENT '删除标记：0-未删除，1-已删除',
+                UNIQUE KEY uk_album_song (album_id, song_id),
+                INDEX idx_album_id (album_id),
+                INDEX idx_song_id (song_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='专辑歌曲关联表'
+            """;
+        jdbcTemplate.execute(sql);
+        log.info("专辑歌曲关联表创建成功");
     }
     
     private void createLyricsTable() {

@@ -26,6 +26,12 @@
           <el-icon><Plus /></el-icon>
           添加歌曲
         </el-button>
+        <el-button
+          style="margin-left: 10px"
+          @click="openAddToAlbumDialog"
+        >
+          将选中歌曲加入专辑
+        </el-button>
       </div>
     </div>
     
@@ -34,7 +40,9 @@
       :data="songList"
       style="width: 100%"
       border
+      @selection-change="handleSelectionChange"
     >
+      <el-table-column type="selection" width="50" />
       <el-table-column prop="id" label="ID" width="80" />
       <el-table-column label="歌曲名称">
         <template #default="scope">
@@ -43,7 +51,7 @@
       </el-table-column>
       <el-table-column label="歌手">
         <template #default="scope">
-          {{ formatName(scope.row.artistName, scope.row.artistNameEn) }}
+          {{ scope.row.artistNames || formatName(scope.row.artistName, scope.row.artistNameEn) }}
         </template>
       </el-table-column>
       <el-table-column label="专辑">
@@ -212,6 +220,40 @@
       v-model:visible="playerVisible" 
       :song="currentSong"
     />
+
+    <!-- 批量加入专辑对话框 -->
+    <el-dialog
+      v-model="addToAlbumDialogVisible"
+      title="将选中歌曲加入到专辑"
+      width="480px"
+    >
+      <p style="margin-bottom: 16px;">
+        当前已选中 <strong>{{ addToAlbumSongIds.length }}</strong> 首歌曲，请选择要加入的目标专辑。
+      </p>
+      <el-form label-width="80px">
+        <el-form-item label="目标专辑">
+          <el-select
+            v-model="addToAlbumTargetAlbumId"
+            placeholder="请选择专辑"
+            filterable
+            style="width: 100%;"
+          >
+            <el-option
+              v-for="album in albumList"
+              :key="album.id"
+              :label="formatName(album.name, album.nameEn)"
+              :value="album.id"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addToAlbumDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="confirmAddSongsToAlbum">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -269,6 +311,12 @@ const manualLyricsForm = reactive({
 const timingEditorVisible = ref(false)
 const timingEditorSong = ref<any>(null)
 
+// 批量加入专辑相关状态
+const selectedSongs = ref<any[]>([])
+const addToAlbumDialogVisible = ref(false)
+const addToAlbumTargetAlbumId = ref<number | null>(null)
+const addToAlbumSongIds = ref<number[]>([])
+
 // 歌曲播放器相关
 const playerVisible = ref(false)
 const currentSong = ref({})
@@ -276,6 +324,11 @@ const currentSong = ref({})
 const handleSongClick = (song: any) => {
   currentSong.value = song
   playerVisible.value = true
+}
+
+// 多选变化
+const handleSelectionChange = (selection: any[]) => {
+  selectedSongs.value = selection
 }
 
 const songRules = {
@@ -347,6 +400,45 @@ const handleSizeChange = (size: number) => {
 const handleCurrentChange = (current: number) => {
   currentPage.value = current
   loadSongs()
+}
+
+// 打开“加入到专辑”对话框
+const openAddToAlbumDialog = () => {
+  if (!selectedSongs.value.length) {
+    ElMessage.warning('请先选择要加入的歌曲')
+    return
+  }
+  addToAlbumSongIds.value = selectedSongs.value
+    .map((item: any) => item.id)
+    .filter((id: any) => typeof id === 'number')
+  if (!addToAlbumSongIds.value.length) {
+    ElMessage.warning('选中的歌曲数据无效')
+    return
+  }
+  addToAlbumTargetAlbumId.value = null
+  addToAlbumDialogVisible.value = true
+}
+
+// 确认批量加入到专辑
+const confirmAddSongsToAlbum = async () => {
+  if (!addToAlbumSongIds.value.length) {
+    ElMessage.warning('请先选择要加入的歌曲')
+    return
+  }
+  if (!addToAlbumTargetAlbumId.value) {
+    ElMessage.warning('请选择目标专辑')
+    return
+  }
+
+  try {
+    await albumApi.bindAlbumSongs(addToAlbumTargetAlbumId.value, addToAlbumSongIds.value)
+    ElMessage.success('已将选中歌曲加入到专辑')
+    addToAlbumDialogVisible.value = false
+    // 刷新列表以保持数据一致
+    await loadSongs()
+  } catch (error: any) {
+    ElMessage.error(error.message || '加入专辑失败')
+  }
 }
 
 const handleAddSong = () => {
