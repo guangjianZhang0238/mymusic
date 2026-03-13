@@ -23,13 +23,9 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class AudioTranscodingServiceImpl implements AudioTranscodingService {
     
-    // FFmpeg可执行文件路径
-    @Value("${music.transcoding.ffmpeg.path:C:\\Users\\zgj\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-8.0.1-full_build\\bin\\ffmpeg.exe}")
+    // FFmpeg可执行文件路径，默认从系统 PATH 中查找 "ffmpeg"
+    @Value("${music.transcoding.ffmpeg.path:ffmpeg}")
     private String ffmpegPath;
-    
-    // 转码临时目录
-    @Value("${music.transcoding.temp.dir:D:\\music_transcoding_temp}")
-    private String tempDir;
     
     // 是否在转码后删除源文件
     @Value("${music.transcoding.delete-source:true}")

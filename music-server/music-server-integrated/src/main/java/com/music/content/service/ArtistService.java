@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.music.api.dto.ArtistDTO;
 import com.music.api.vo.ArtistVO;
+import com.music.api.vo.MatchAvatarResultVO;
 import com.music.content.entity.Artist;
 
 public interface ArtistService extends IService<Artist> {
@@ -19,4 +20,6 @@ public interface ArtistService extends IService<Artist> {
     void delete(Long id);
     
     java.util.Map<String, Object> scanArtists();
+
+    MatchAvatarResultVO matchAvatar(Long id);
 }

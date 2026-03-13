@@ -74,6 +74,16 @@
           >
             删除
           </el-button>
+          <el-button
+            v-if="!scope.row.avatar"
+            size="small"
+            type="warning"
+            :loading="matchingAvatarIds.has(scope.row.id)"
+            :disabled="matchingAvatarIds.has(scope.row.id)"
+            @click="handleMatchAvatar(scope.row)"
+          >
+            匹配头像
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -160,7 +170,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
-import { getArtistList, createArtist, updateArtist, deleteArtist } from '@/api/artist'
+import { getArtistList, createArtist, updateArtist, deleteArtist, matchArtistAvatar } from '@/api/artist'
 import type { ArtistVO } from '@/api/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Refresh } from '@element-plus/icons-vue'
@@ -179,6 +189,7 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('添加歌手')
 const artistFormRef = ref()
 const avatarUploading = ref(false)
+const matchingAvatarIds = reactive(new Set<number>())
 const artistForm = reactive({
   id: 0,
   name: '',
@@ -287,6 +298,26 @@ const handleDeleteArtist = async (id: number) => {
   }
 }
 
+const handleMatchAvatar = async (artist: ArtistVO) => {
+  if (!artist?.id) return
+  if (artist.avatar) return
+
+  matchingAvatarIds.add(artist.id)
+  try {
+    const res = await matchArtistAvatar(artist.id)
+    if (res && (res as any).avatar) {
+      ElMessage.success('头像匹配成功')
+    } else {
+      ElMessage.success('头像匹配成功')
+    }
+    await loadArtists()
+  } catch (error: any) {
+    ElMessage.error(error.message || '头像匹配失败')
+  } finally {
+    matchingAvatarIds.delete(artist.id)
+  }
+}
+
 const handleStatusChange = async (artist: ArtistVO) => {
   try {
     await updateArtist(artist)
@@ -314,7 +345,7 @@ const handleAvatarError = (error: any) => {
   ElMessage.error('头像上传失败：' + (error.message || '未知错误'))
 }
 
-const handleAvatarProgress = (event: any) => {
+const handleAvatarProgress = () => {
   // 可以在这里添加进度条逻辑
 }
 

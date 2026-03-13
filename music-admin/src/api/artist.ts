@@ -37,3 +37,8 @@ export const deleteArtist = (id: number) => {
 export const scanArtists = () => {
   return request.post('/artist/scan')
 }
+
+// 匹配歌手头像（iTunes）
+export const matchArtistAvatar = (id: number) => {
+  return request.post<{ avatar: string }>(`/artist/${id}/match-avatar`)
+}

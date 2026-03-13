@@ -16,6 +16,7 @@ import com.music.file.config.StorageConfig;
 import com.music.file.service.FileUploadService;
 import com.music.file.service.MusicMetadataService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,6 +43,7 @@ public class FileUploadServiceImpl implements FileUploadService {
     private AlbumService albumService;
 
     @Resource
+    @Lazy
     private ArtistService artistService;
 
     @Resource

@@ -16,6 +16,7 @@ import com.music.file.config.StorageConfig;
 import com.music.file.service.MusicMetadataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MusicMetadataServiceImpl implements MusicMetadataService {
     
+    @Lazy
     private final ArtistService artistService;
     private final AlbumService albumService;
     private final ArtistMapper artistMapper;

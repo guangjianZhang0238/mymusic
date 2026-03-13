@@ -1,8 +1,14 @@
 package com.music.common.constant;
 
 public interface MusicConstants {
-    String DEFAULT_STORAGE_PATH = "D:\\music_source";
-    String DEFAULT_TEMP_PATH = "D:\\music_temp";
+    /**
+     * 相对于数据根目录（可通过配置指定）的基础存储目录名称。
+     */
+    String DEFAULT_STORAGE_PATH = "music_source";
+    /**
+     * 相对于数据根目录（可通过配置指定）的临时存储目录名称。
+     */
+    String DEFAULT_TEMP_PATH = "music_temp";
     
     String[] SUPPORTED_AUDIO_FORMATS = {"wav", "flac", "mp3", "aac", "m4a", "ogg", "dsf"};
     String[] SUPPORTED_LYRICS_FORMATS = {"lrc", "txt"};

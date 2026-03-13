@@ -3,6 +3,7 @@ package com.music.content.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.music.api.dto.ArtistDTO;
 import com.music.api.vo.ArtistVO;
+import com.music.api.vo.MatchAvatarResultVO;
 import com.music.common.core.domain.Result;
 import com.music.content.service.ArtistService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -58,5 +59,11 @@ public class ArtistController {
     @PostMapping("/scan")
     public Result<java.util.Map<String, Object>> scanArtists() {
         return Result.success(artistService.scanArtists());
+    }
+
+    @Operation(summary = "匹配歌手头像（iTunes）")
+    @PostMapping("/{id}/match-avatar")
+    public Result<MatchAvatarResultVO> matchAvatar(@PathVariable Long id) {
+        return Result.success(artistService.matchAvatar(id));
     }
 }

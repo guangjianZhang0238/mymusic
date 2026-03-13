@@ -31,6 +31,8 @@ public class RestTemplateConfig {
                     stringConverter.setSupportedMediaTypes(Arrays.asList(
                             new org.springframework.http.MediaType("text", "plain", StandardCharsets.UTF_8),
                             new org.springframework.http.MediaType("text", "html", StandardCharsets.UTF_8),
+                            // iTunes Search API may respond with Content-Type: text/javascript;charset=utf-8
+                            new org.springframework.http.MediaType("text", "javascript", StandardCharsets.UTF_8),
                             new org.springframework.http.MediaType("application", "json", StandardCharsets.UTF_8),
                             org.springframework.http.MediaType.TEXT_PLAIN,
                             org.springframework.http.MediaType.TEXT_HTML,

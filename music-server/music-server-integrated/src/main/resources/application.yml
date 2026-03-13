@@ -92,16 +92,21 @@ mybatis-plus:
 
 music:
   storage:
-    base-path: C:\project\exercises\mymusic\data_folder\music_source
-    temp-path: C:\project\exercises\mymusic\data_folder\music_temp
+    # 数据根目录，可以是绝对路径或相对路径（相对于应用启动目录）
+    # Windows 示例：D:/mymusic-data
+    # Linux  示例：/data/mymusic
+    # 相对路径示例（推荐开发环境使用）：data
+    data-root-url: C:/project/exercises/mymusic/data_folder
+    # 在数据根目录下的业务存储根目录和临时目录（相对路径）
+    base-path: music_source
+    temp-path: music_temp
     # 单个文件最大上传大小（字节）。2GB
     max-file-size: 2147483648
   
   transcoding:
     ffmpeg:
+      # 默认使用系统 PATH 中的 ffmpeg，可根据部署环境覆盖为绝对路径
       path: C:\ffmpeg\ffmpeg\ffmpeg-8.0.1-essentials_build\bin\ffmpeg.exe
-    temp:
-      dir: C:\project\exercises\mymusic\data_folder\music_transcoding_temp
     delete-source: true
     auto-transcode: true
   
