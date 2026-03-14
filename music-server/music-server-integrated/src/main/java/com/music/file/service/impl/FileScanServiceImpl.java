@@ -218,9 +218,10 @@ public class FileScanServiceImpl implements FileScanService {
             // 检查是否需要转码（DSF和WAV文件）
             File processedFile = songFile;
             String originalFormat = StringUtils.getFilenameExtension(fileName);
-            boolean needsTranscoding = transcodingService.needsTranscoding(songFile);
+            boolean needsTranscoding = transcodingService.isTranscodingEnabled()
+                    && transcodingService.needsTranscoding(songFile);
             File sourceFileToDelete = null; // 转码成功后需要删除的原始文件
-            
+
             if (needsTranscoding) {
                 String fileType = StringUtils.getFilenameExtension(fileName);
                 log.info("检测到需要转码的文件（{}），开始自动转码: {}", fileType, filePath);

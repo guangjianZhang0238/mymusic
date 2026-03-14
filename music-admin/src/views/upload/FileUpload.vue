@@ -127,6 +127,7 @@
                   :fetch-suggestions="searchChorusArtists"
                   placeholder="输入歌手名搜索并从下拉中选择（可不填）"
                   @select="(item) => handleChorusSelect(scope.row, item)"
+                  @keyup.enter="handleChorusEnter(scope.row)"
                   clearable
                   style="width: 100%"
                 >
@@ -604,6 +605,22 @@ const handleChorusSelect = (row: PendingFile, item: Artist) => {
   if (!exists) {
     row.chorusArtists.push({ id: item.id, name: item.name })
   }
+  row.chorusKeyword = ''
+}
+
+const handleChorusEnter = (row: PendingFile) => {
+  const keyword = row.chorusKeyword?.trim()
+  if (!keyword) return
+
+  if (!row.chorusArtists) {
+    row.chorusArtists = []
+  }
+
+  const exists = row.chorusArtists.some(a => a.name === keyword)
+  if (!exists) {
+    row.chorusArtists.push({ name: keyword })
+  }
+
   row.chorusKeyword = ''
 }
 

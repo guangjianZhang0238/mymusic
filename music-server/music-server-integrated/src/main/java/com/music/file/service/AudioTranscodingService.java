@@ -48,4 +48,16 @@ public interface AudioTranscodingService {
      * @return 转码后的文件名
      */
     String getTranscodedFileName(String originalFileName, String targetFormat);
+
+    /**
+     * 是否启用自动转码（由配置 music.transcoding.auto-transcode 控制）
+     * @return true 时上传与扫描中的 WAV/DSF 会尝试转码
+     */
+    boolean isTranscodingEnabled();
+
+    /**
+     * 检查 FFmpeg 是否可用（可执行且返回成功）
+     * @return true 表示 ffmpeg 可正常调用
+     */
+    boolean isFfmpegAvailable();
 }

@@ -30,9 +30,9 @@ spring:
       force-response: true
   
   datasource:
-    url: jdbc:mysql://103.215.83.202:3306/music_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true&connectionCharset=utf8mb4&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2
+    url: jdbc:mysql://localhost:3306/music_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true&connectionCharset=utf8mb4&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2
     username: root
-    password: rDEKHWaEtnJFsKTh
+    password: 43ae1ff64991
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       # 连接池基本配置
@@ -51,7 +51,7 @@ spring:
       auto-commit: true
   
   redis:
-    host: 103.215.83.202
+    host: localhost
     port: 6379
     database: 0
     password: Guangjian38+++
@@ -103,11 +103,13 @@ music:
     # 单个文件最大上传大小（字节）。2GB
     max-file-size: 2147483648
   
+  # 上传/扫描时 WAV、DSF 自动转码为 FLAC（失败则尝试 AAC）
   transcoding:
     ffmpeg:
-      # 默认使用系统 PATH 中的 ffmpeg，可根据部署环境覆盖为绝对路径
-      path: C:\ffmpeg\ffmpeg\ffmpeg-8.0.1-essentials_build\bin\ffmpeg.exe
+      # 默认使用系统 PATH 中的 ffmpeg；可用环境变量 FFMPEG_PATH 或此处配置绝对路径（如 Windows: C:/ffmpeg/bin/ffmpeg.exe）
+      path: ${FFMPEG_PATH:ffmpeg}
     delete-source: true
+    # 为 true 时，上传与扫描中的 WAV/DSF 会自动转码
     auto-transcode: true
   
   jwt:

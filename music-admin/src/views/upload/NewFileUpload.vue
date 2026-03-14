@@ -33,25 +33,40 @@
         
         <el-col :span="12">
           <el-form-item label="其他歌手">
-            <el-select
-              v-model="selectedAdditionalArtists"
-              multiple
-              filterable
-              remote
-              :remote-method="searchAdditionalArtists"
-              placeholder="可选择其他合作歌手"
-              style="width: 100%"
-            >
-              <el-option
-                v-for="artist in additionalArtistOptions"
-                :key="artist.id"
-                :label="artist.name"
-                :value="artist.id"
+            <div class="chorus-selector">
+              <el-autocomplete
+                v-model="additionalArtistKeyword"
+                :fetch-suggestions="searchChorusArtists"
+                placeholder="输入歌手名搜索并从下拉中选择（可不填）"
+                @select="handleAdditionalArtistSelect"
+                @keyup.enter="handleAdditionalArtistEnter"
+                clearable
+                style="width: 100%"
               >
-                <span style="float: left">{{ artist.name }}</span>
-                <span style="float: right; color: #8492a6; font-size: 13px">{{ artist.albumCount }}专辑</span>
-              </el-option>
-            </el-select>
+                <template #default="{ item }">
+                  <div class="artist-suggestion">
+                    <span class="artist-name">{{ item.name }}</span>
+                    <span class="artist-stats">{{ item.albumCount }}专辑 {{ item.songCount }}歌曲</span>
+                  </div>
+                </template>
+              </el-autocomplete>
+              <div
+                v-if="additionalArtists.length"
+                class="chorus-tags"
+              >
+                <span class="chorus-tags-label">已选其他歌手：</span>
+                <el-tag
+                  v-for="artist in additionalArtists"
+                  :key="artist.id ?? artist.name"
+                  size="small"
+                  closable
+                  @close="removeAdditionalArtist(artist)"
+                  class="chorus-tag-item"
+                >
+                  {{ artist.name }}
+                </el-tag>
+              </div>
+            </div>
           </el-form-item>
         </el-col>
         
@@ -131,43 +146,6 @@
         <h4>待上传文件 ({{ pendingFiles.length }}个，合计 {{ formatFileSize(pendingTotalSize) }})</h4>
         <el-table :data="pendingFiles" style="width: 100%" max-height="300">
           <el-table-column prop="name" label="文件名" />
-          <el-table-column label="合唱歌手" width="300">
-            <template #default="scope">
-              <div class="chorus-selector">
-                <el-autocomplete
-                  v-model="scope.row.chorusKeyword"
-                  :fetch-suggestions="searchChorusArtists"
-                  placeholder="输入歌手名搜索并从下拉中选择（可不填）"
-                  @select="(item) => handleChorusSelect(scope.row, item)"
-                  clearable
-                  style="width: 100%"
-                >
-                  <template #default="{ item }">
-                    <div class="artist-suggestion">
-                      <span class="artist-name">{{ item.name }}</span>
-                      <span class="artist-stats">{{ item.albumCount }}专辑 {{ item.songCount }}歌曲</span>
-                    </div>
-                  </template>
-                </el-autocomplete>
-                <div
-                  v-if="scope.row.chorusArtists && scope.row.chorusArtists.length"
-                  class="chorus-tags"
-                >
-                  <span class="chorus-tags-label">已选合唱歌手：</span>
-                  <el-tag
-                    v-for="artist in scope.row.chorusArtists"
-                    :key="artist.id ?? artist.name"
-                    size="small"
-                    closable
-                    @close="removeChorusArtist(scope.row, artist)"
-                    class="chorus-tag-item"
-                  >
-                    {{ artist.name }}
-                  </el-tag>
-                </div>
-              </div>
-            </template>
-          </el-table-column>
           <el-table-column prop="size" label="大小" width="120">
             <template #default="scope">
               {{ formatFileSize(scope.row.size) }}
@@ -247,6 +225,9 @@ const token = computed(() => userStore.token)
 // 歌手和专辑选择状态
 const selectedArtist = ref<Artist>({ name: '' })
 const selectedAlbum = ref<Album>({ name: '' })
+// 其他歌手（顶部范围）的 chips
+const additionalArtists = ref<ChorusArtist[]>([])
+const additionalArtistKeyword = ref('')
 
 // 文件上传状态
 const pendingFiles = ref<PendingFile[]>([])
@@ -391,19 +372,28 @@ const searchChorusArtists = async (keyword: string, callback: (results: Artist[]
   }
 }
 
-const handleChorusSelect = (row: PendingFile, item: Artist) => {
-  if (!row.chorusArtists) {
-    row.chorusArtists = []
-  }
-  const exists = row.chorusArtists.some(a => a.id === item.id || a.name === item.name)
+const handleAdditionalArtistSelect = (item: Artist) => {
+  const exists = additionalArtists.value.some(a => a.id === item.id || a.name === item.name)
   if (!exists) {
-    row.chorusArtists.push({ id: item.id, name: item.name })
+    additionalArtists.value.push({ id: item.id, name: item.name })
   }
-  row.chorusKeyword = ''
+  additionalArtistKeyword.value = ''
 }
 
-const removeChorusArtist = (row: PendingFile, artist: ChorusArtist) => {
-  row.chorusArtists = row.chorusArtists.filter(
+const handleAdditionalArtistEnter = () => {
+  const keyword = additionalArtistKeyword.value.trim()
+  if (!keyword) return
+
+  const exists = additionalArtists.value.some(a => a.name === keyword)
+  if (!exists) {
+    additionalArtists.value.push({ name: keyword })
+  }
+
+  additionalArtistKeyword.value = ''
+}
+
+const removeAdditionalArtist = (artist: ChorusArtist) => {
+  additionalArtists.value = additionalArtists.value.filter(
     a => !(a.id === artist.id && a.name === artist.name)
   )
 }
@@ -490,7 +480,18 @@ const uploadSingleFile = async (pendingFile: PendingFile, albumId: number, index
   const formData = new FormData()
   formData.append('file', pendingFile.file)
   formData.append('albumId', albumId.toString())
-  const chorusArtists = pendingFile.chorusArtists || []
+  // 合并顶部“其他歌手”和当前文件行的合唱歌手，去重
+  const fileChorusArtists = pendingFile.chorusArtists || []
+  const merged: ChorusArtist[] = []
+  const pushUnique = (artist?: ChorusArtist) => {
+    if (!artist || !artist.name?.trim()) return
+    const exists = merged.some(a => (a.id && artist.id && a.id === artist.id) || a.name === artist.name)
+    if (!exists) merged.push(artist)
+  }
+  additionalArtists.value.forEach(a => pushUnique(a))
+  fileChorusArtists.forEach(a => pushUnique(a))
+
+  const chorusArtists = merged
   for (const a of chorusArtists) {
     if (a.id != null) formData.append('chorusArtistIds', String(a.id))
     if (a.name) formData.append('chorusArtistNames', a.name)

@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 object NetworkModule {
     // 公网地址，通过frp映射
-    const val BASE_URL = "http://120.79.224.90:48080/"
+    const val BASE_URL = "http://120.79.224.90:18080/"
 //    const val BASE_URL = "http://127.0.0.1:8080/"
     val staticBaseUrl: String
         get() = BASE_URL + "static/"

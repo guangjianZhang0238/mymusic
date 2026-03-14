@@ -3,6 +3,7 @@ package com.music.file.service.impl;
 import com.music.common.constant.MusicConstants;
 import com.music.file.entity.TranscodingResult;
 import com.music.file.service.AudioTranscodingService;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,7 +31,41 @@ public class AudioTranscodingServiceImpl implements AudioTranscodingService {
     // 是否在转码后删除源文件
     @Value("${music.transcoding.delete-source:true}")
     private boolean deleteSourceAfterTranscoding;
-    
+
+    // 是否启用自动转码（上传与扫描中的 WAV/DSF）
+    @Value("${music.transcoding.auto-transcode:true}")
+    private boolean autoTranscodeEnabled;
+
+    @PostConstruct
+    public void checkFfmpegOnStartup() {
+        if (!isFfmpegAvailable()) {
+            log.warn("FFmpeg 不可用，转码将失败: path={}", ffmpegPath);
+        }
+    }
+
+    @Override
+    public boolean isTranscodingEnabled() {
+        return autoTranscodeEnabled;
+    }
+
+    @Override
+    public boolean isFfmpegAvailable() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(ffmpegPath, "-version");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            boolean finished = p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            if (!finished) {
+                p.destroyForcibly();
+                return false;
+            }
+            return p.exitValue() == 0;
+        } catch (Exception e) {
+            log.debug("FFmpeg 可用性检查失败: {}", e.getMessage());
+            return false;
+        }
+    }
+
     @Override
     public TranscodingResult transcodeDSFToFLAC(File sourceFile, File targetFile) {
         long startTime = System.currentTimeMillis();

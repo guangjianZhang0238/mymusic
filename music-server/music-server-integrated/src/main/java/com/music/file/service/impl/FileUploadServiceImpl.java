@@ -13,6 +13,8 @@ import com.music.content.service.AlbumService;
 import com.music.content.service.SongService;
 import com.music.content.service.ArtistService;
 import com.music.file.config.StorageConfig;
+import com.music.file.entity.TranscodingResult;
+import com.music.file.service.AudioTranscodingService;
 import com.music.file.service.FileUploadService;
 import com.music.file.service.MusicMetadataService;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +59,10 @@ public class FileUploadServiceImpl implements FileUploadService {
 
     @Resource
     private ArtistMapper artistMapper;
-    
+
+    @Resource
+    private AudioTranscodingService transcodingService;
+
     @Override
     public Map<String, Object> uploadFile(MultipartFile file, Long userId) {
         if (file.isEmpty()) {
@@ -70,23 +75,46 @@ public class FileUploadServiceImpl implements FileUploadService {
         
         String originalFilename = file.getOriginalFilename();
         String extension = getFileExtension(originalFilename);
-        
+
         String relativePath = generateRelativePath(userId, extension);
-        String filePath = saveFile(file, relativePath);
-        
+        saveFile(file, relativePath);
+
+        String resultPath = relativePath;
+        String resultFilename = originalFilename;
+        long resultSize = file.getSize();
+        String resultContentType = file.getContentType();
+
+        File savedFile = new File(storageConfig.getBasePath(), relativePath.replace("/", File.separator));
+        if (transcodingService.isTranscodingEnabled() && transcodingService.needsTranscoding(savedFile)) {
+            TranscodingResult tr = transcodingService.autoTranscode(savedFile, savedFile.getParentFile());
+            if (tr.isSuccess()) {
+                File targetFile = new File(tr.getTargetPath());
+                resultPath = toRelativePath(tr.getTargetPath());
+                resultFilename = targetFile.getName();
+                resultSize = targetFile.length();
+                resultContentType = "audio/" + (tr.getTargetFormat() != null ? tr.getTargetFormat().toLowerCase() : "flac");
+                if (!tr.isSourceDeleted() && savedFile.exists()) {
+                    savedFile.delete();
+                }
+                log.info("上传文件转码成功: {} -> {}", originalFilename, resultFilename);
+            } else {
+                log.warn("上传文件转码失败，保留原文件: {} - {}", originalFilename, tr.getErrorMessage());
+            }
+        }
+
         Map<String, Object> result = new HashMap<>();
-        result.put("filename", originalFilename);
-        result.put("size", file.getSize());
-        result.put("path", relativePath);
-        result.put("fullPath", filePath);
+        result.put("filename", resultFilename);
+        result.put("size", resultSize);
+        result.put("path", resultPath);
+        result.put("fullPath", storageConfig.getBasePath() + File.separator + resultPath.replace("/", File.separator));
         result.put("userId", userId);
-        result.put("contentType", file.getContentType());
-        
-        log.info("文件上传成功：userId={}, filename={}, size={}, path={}", userId, originalFilename, file.getSize(), relativePath);
-        
+        result.put("contentType", resultContentType);
+
+        log.info("文件上传成功：userId={}, filename={}, size={}, path={}", userId, resultFilename, resultSize, resultPath);
+
         return result;
     }
-    
+
     @Override
     public Map<String, Object> uploadFileWithAlbum(
             MultipartFile file,
@@ -115,26 +143,49 @@ public class FileUploadServiceImpl implements FileUploadService {
         
         // 生成基于专辑的相对路径
         String relativePath = album.getFolderPath() + "/" + originalFilename;
-        String filePath = saveFile(file, relativePath);
-        
+        saveFile(file, relativePath);
+
+        String resultPath = relativePath;
+        String resultFilename = originalFilename;
+        long resultSize = file.getSize();
+        String resultFormat = extension;
+
+        File savedFile = new File(storageConfig.getBasePath(), relativePath.replace("/", File.separator));
+        if (transcodingService.isTranscodingEnabled() && transcodingService.needsTranscoding(savedFile)) {
+            TranscodingResult tr = transcodingService.autoTranscode(savedFile, savedFile.getParentFile());
+            if (tr.isSuccess()) {
+                File targetFile = new File(tr.getTargetPath());
+                resultPath = toRelativePath(tr.getTargetPath());
+                resultFilename = targetFile.getName();
+                resultSize = targetFile.length();
+                resultFormat = tr.getTargetFormat() != null ? tr.getTargetFormat() : "flac";
+                if (!tr.isSourceDeleted() && savedFile.exists()) {
+                    savedFile.delete();
+                }
+                log.info("带专辑上传文件转码成功: {} -> {}", originalFilename, resultFilename);
+            } else {
+                log.warn("带专辑上传文件转码失败，保留原文件: {} - {}", originalFilename, tr.getErrorMessage());
+            }
+        }
+
         // 合唱歌手：已有 ID 的直接使用，仅有名称的自动匹配或创建，得到最终 ID 列表
         List<Long> resolvedChorusIds = resolveChorusArtistIds(chorusArtistIds, chorusArtistNames);
 
         // 直接创建歌曲记录并建立歌手关联（无需 .artists.json）
-        createSongAndArtistLinks(album, relativePath, originalFilename, file.getSize(), extension, resolvedChorusIds);
-        
+        createSongAndArtistLinks(album, resultPath, resultFilename, resultSize, resultFormat, resolvedChorusIds);
+
         Map<String, Object> result = new HashMap<>();
-        result.put("filename", originalFilename);
-        result.put("size", file.getSize());
-        result.put("path", relativePath);
-        result.put("fullPath", filePath);
+        result.put("filename", resultFilename);
+        result.put("size", resultSize);
+        result.put("path", resultPath);
+        result.put("fullPath", storageConfig.getBasePath() + File.separator + resultPath.replace("/", File.separator));
         result.put("userId", userId);
         result.put("albumId", albumId);
         result.put("contentType", file.getContentType());
-        
-        log.info("带专辑文件上传成功：userId={}, albumId={}, filename={}, size={}, path={}", 
-                userId, albumId, originalFilename, file.getSize(), relativePath);
-        
+
+        log.info("带专辑文件上传成功：userId={}, albumId={}, filename={}, size={}, path={}",
+                userId, albumId, resultFilename, resultSize, resultPath);
+
         return result;
     }
     
@@ -573,5 +624,22 @@ public class FileUploadServiceImpl implements FileUploadService {
             return "";
         }
         return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
+    }
+
+    /** 将绝对路径转为相对于 basePath 的相对路径，使用 "/" 分隔符 */
+    private String toRelativePath(String absolutePath) {
+        if (absolutePath == null) {
+            return "";
+        }
+        String base = storageConfig.getBasePath().replace("/", File.separator);
+        String normalized = absolutePath.replace("/", File.separator);
+        if (normalized.startsWith(base)) {
+            String rel = normalized.substring(base.length());
+            if (rel.startsWith(File.separator)) {
+                rel = rel.substring(File.separator.length());
+            }
+            return rel.replace(File.separator, "/");
+        }
+        return absolutePath.replace(File.separator, "/");
     }
 }
