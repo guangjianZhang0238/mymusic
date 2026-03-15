@@ -778,7 +778,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkLoginStatus() {
         viewModelScope.launch {
-            val app = getApplication()
+            val app = getApplication<Application>()
             val token = TokenStore.getToken(app)
             if (token.isNullOrBlank()) {
                 _uiState.value = _uiState.value.copy(isLoggedIn = false)
@@ -802,7 +802,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
      */
     private fun validateTokenAndLoadData() {
         viewModelScope.launch(Dispatchers.IO) {
-            val app = getApplication()
+            val app = getApplication<Application>()
             try {
                 var userInfo = repository.getCurrentUser()
                 if (userInfo == null || userInfo.userInfo == null) {
@@ -902,7 +902,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val result = repository.login(username, password)
                 if (result != null) {
-                    val app = getApplication()
+                    val app = getApplication<Application>()
                     TokenStore.saveToken(app, result.token ?: "")
                     TokenStore.saveUserInfo(app, result.userInfo?.id, result.userInfo?.username, result.userInfo?.nickname)
                     _uiState.value = _uiState.value.copy(
