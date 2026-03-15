@@ -778,38 +778,54 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun checkLoginStatus() {
         viewModelScope.launch {
-            val token = TokenStore.getToken(getApplication())
+            val app = getApplication()
+            val token = TokenStore.getToken(app)
             if (token.isNullOrBlank()) {
-                // 没有token，未登录，立即更新状态
                 _uiState.value = _uiState.value.copy(isLoggedIn = false)
                 return@launch
             }
-            
-            // 有token，先假设已登录，让UI可以立即响应
-            // 同时启动后台验证
+            // 超过 15 天免登期限，清除 token，要求重新登录
+            if (!TokenStore.isWithin15Days(app)) {
+                TokenStore.clearToken(app)
+                _uiState.value = _uiState.value.copy(isLoggedIn = false)
+                return@launch
+            }
+            // 在 15 天内：先视为已登录，再在后台验证/刷新 token
             _uiState.value = _uiState.value.copy(isLoggedIn = true)
-            
-            // 在后台验证token有效性
             validateTokenAndLoadData()
         }
     }
     
     /**
-     * 验证token并加载用户数据（在后台执行）
+     * 验证 token 并加载用户数据（在后台执行）。
+     * 若服务端 token 过期会先尝试刷新；在 15 天免登期内不会因验证失败而要求重新登录。
      */
     private fun validateTokenAndLoadData() {
         viewModelScope.launch(Dispatchers.IO) {
+            val app = getApplication()
             try {
-                val userInfo = repository.getCurrentUser()
+                var userInfo = repository.getCurrentUser()
+                if (userInfo == null || userInfo.userInfo == null) {
+                    // 服务端 token 可能过期，尝试刷新（每次登录会刷新 15 天期限）
+                    val token = TokenStore.getToken(app)
+                    if (!token.isNullOrBlank()) {
+                        val newToken = repository.refreshToken(token)
+                        if (!newToken.isNullOrBlank()) {
+                            withContext(Dispatchers.Main) {
+                                TokenStore.saveToken(app, newToken)
+                            }
+                            userInfo = repository.getCurrentUser()
+                        }
+                    }
+                }
                 if (userInfo != null && userInfo.userInfo != null) {
-                    // token有效，更新用户信息
                     withContext(Dispatchers.Main) {
+                        TokenStore.saveUserInfo(app, userInfo.userInfo.id, userInfo.userInfo.username, userInfo.userInfo.nickname)
                         _uiState.value = _uiState.value.copy(
                             isLoggedIn = true,
                             currentUser = userInfo.userInfo
                         )
                     }
-                    // 在后台并行加载用户数据
                     coroutineScope {
                         launch { loadFavoriteSongIds() }
                         launch { loadRecentPlayedSongs() }
@@ -817,15 +833,37 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         launch { loadPlaybackPlaylist() }
                     }
                 } else {
-                    // token无效或过期，清除token并标记为未登录
-                    withContext(Dispatchers.Main) {
-                        TokenStore.clearToken(getApplication())
-                        _uiState.value = _uiState.value.copy(isLoggedIn = false)
+                    // 验证/刷新都失败：仍在 15 天免登期内则保留登录状态，用本地缓存用户信息
+                    if (TokenStore.isWithin15Days(app)) {
+                        val uid = TokenStore.getUserId(app)
+                        val uname = TokenStore.getUsername(app)
+                        val nickname = TokenStore.getNickname(app)
+                        val cachedUser = if (uid != null && uname != null) {
+                            UserInfo(id = uid, username = uname, nickname = nickname)
+                        } else null
+                        withContext(Dispatchers.Main) {
+                            _uiState.value = _uiState.value.copy(isLoggedIn = true, currentUser = cachedUser)
+                        }
+                    } else {
+                        withContext(Dispatchers.Main) {
+                            TokenStore.clearToken(app)
+                            _uiState.value = _uiState.value.copy(isLoggedIn = false)
+                        }
                     }
                 }
             } catch (e: Exception) {
-                // 网络异常，保持当前登录状态
                 Log.e("MusicViewModel", "验证token失败", e)
+                if (TokenStore.isWithin15Days(app)) {
+                    val uid = TokenStore.getUserId(app)
+                    val uname = TokenStore.getUsername(app)
+                    val nickname = TokenStore.getNickname(app)
+                    val cachedUser = if (uid != null && uname != null) {
+                        UserInfo(id = uid, username = uname, nickname = nickname)
+                    } else null
+                    withContext(Dispatchers.Main) {
+                        _uiState.value = _uiState.value.copy(isLoggedIn = true, currentUser = cachedUser)
+                    }
+                }
             }
         }
     }
@@ -864,14 +902,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val result = repository.login(username, password)
                 if (result != null) {
-                    TokenStore.saveToken(getApplication(), result.token ?: "")
+                    val app = getApplication()
+                    TokenStore.saveToken(app, result.token ?: "")
+                    TokenStore.saveUserInfo(app, result.userInfo?.id, result.userInfo?.username, result.userInfo?.nickname)
                     _uiState.value = _uiState.value.copy(
                         currentUser = result.userInfo,
                         isLoggedIn = true,
                         loginLoading = false
                     )
-                    // 提示登录成功
-                    Toast.makeText(getApplication(), "登录成功", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(app, "登录成功", Toast.LENGTH_SHORT).show()
                     // 登录成功后加载用户数据
                     loadUserPlaylists()
                     loadFavoriteSongIds()

@@ -102,9 +102,9 @@ fun MusicApp(viewModel: MusicViewModel = viewModel()) {
     
     // 获取当前上下文用于检查本地token
     val context = androidx.compose.ui.platform.LocalContext.current
-    // 根据本地token快速决定初始登录状态（避免等待网络请求）
+    // 根据本地 token 且 15 天免登期内，决定是否直接进首页
     val hasLocalToken by remember { 
-        mutableStateOf(TokenStore.getToken(context) != null)
+        mutableStateOf(TokenStore.isLoggedInWithin15Days(context))
     }
 
     // 应用启动时立即检查登录状态（后台验证）

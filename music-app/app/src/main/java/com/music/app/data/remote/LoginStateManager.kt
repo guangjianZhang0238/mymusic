@@ -53,10 +53,15 @@ class LoginStateManager(private val context: Context) {
     
     /**
      * 刷新登录状态（如果需要）
+     * 超过 15 天免登期则清除本地 token，下次启动需重新登录
      */
     private suspend fun refreshLoginStatusIfNeeded() {
         val token = TokenStore.getToken(context)
         if (token != null) {
+            if (!TokenStore.isWithin15Days(context)) {
+                TokenStore.clearToken(context)
+                return
+            }
             // 检查token是否即将过期（剩余1天时刷新）
             val userId = TokenStore.getUserId(context)
             if (userId != null) {

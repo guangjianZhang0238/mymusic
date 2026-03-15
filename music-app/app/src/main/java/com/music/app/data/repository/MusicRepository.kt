@@ -309,7 +309,7 @@ class MusicRepository {
     }
 
     suspend fun refreshToken(token: String): String? = try {
-        api.refreshToken(token).data
+        api.refreshToken("Bearer $token").data
     } catch (_: Exception) {
         null
     }
