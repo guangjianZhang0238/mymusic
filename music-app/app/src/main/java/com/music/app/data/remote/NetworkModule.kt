@@ -38,8 +38,8 @@ object NetworkModule {
             // Token 拦截器：自动将本地存储的 token 添加到请求头
             .addInterceptor { chain ->
                 val ctx = appContext
-                val token = if (ctx != null) TokenStore.getToken(ctx) else null
-                val request = if (token != null) {
+                val token = if (ctx != null && TokenStore.isLoggedInWithin15Days(ctx)) TokenStore.getToken(ctx) else null
+                val request = if (!token.isNullOrBlank()) {
                     chain.request().newBuilder()
                         .addHeader("Authorization", "Bearer $token")
                         .build()

@@ -30,6 +30,10 @@ object TokenStore {
      * 保存 token，并刷新「免登录」期限（本次起 15 天内有效）
      */
     fun saveToken(context: Context, token: String) {
+        if (token.isBlank()) {
+            clearToken(context)
+            return
+        }
         cachedToken = token
         getPrefs(context).edit()
             .putString(KEY_TOKEN, token)
@@ -87,9 +91,10 @@ object TokenStore {
     }
 
     /** 有 token 且在 15 天内，视为已登录可免登 */
-    fun isLoggedIn(context: Context): Boolean = getToken(context) != null
+    fun isLoggedIn(context: Context): Boolean =
+        !getToken(context).isNullOrBlank() && isWithin15Days(context)
 
     /** 已登录且在 15 天免登期内（用于启动时决定是否直接进首页） */
     fun isLoggedInWithin15Days(context: Context): Boolean =
-        getToken(context) != null && isWithin15Days(context)
+        !getToken(context).isNullOrBlank() && isWithin15Days(context)
 }
