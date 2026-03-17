@@ -84,6 +84,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
 
     val progress = uiState.progressMs.toFloat().coerceAtLeast(0f)
     val buffered = uiState.bufferedPositionMs.toFloat().coerceAtLeast(0f)
+    val bufferedPercent = uiState.bufferedPercent.coerceIn(0, 100)
     val duration = uiState.durationMs.toFloat().coerceAtLeast(1f)
 
     Column(
@@ -116,6 +117,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
         BufferedProgressSlider(
             progress = progress,
             buffered = buffered,
+            bufferedPercent = bufferedPercent,
             duration = duration,
             onSeekTo = { viewModel.seekTo(it.toLong()) }
         )
@@ -233,16 +235,19 @@ fun PlayerScreen(viewModel: MusicViewModel) {
 private fun BufferedProgressSlider(
     progress: Float,
     buffered: Float,
+    bufferedPercent: Int,
     duration: Float,
     onSeekTo: (Float) -> Unit,
     trackHeight: Dp = 4.dp
 ) {
     val safeDuration = max(duration, 1f)
     val progressFraction = (progress / safeDuration).coerceIn(0f, 1f)
-    val bufferedFraction = (buffered / safeDuration).coerceIn(0f, 1f)
+    val bufferedFractionFromPosition = (buffered / safeDuration).coerceIn(0f, 1f)
+    val bufferedFractionFromPercent = (bufferedPercent / 100f).coerceIn(0f, 1f)
+    val bufferedFraction = max(bufferedFractionFromPosition, bufferedFractionFromPercent)
 
     val playedColor = MaterialTheme.colorScheme.primary
-    val bufferedColor = Color.White.copy(alpha = 0.35f)
+    val bufferedColor = Color.White.copy(alpha = 0.45f)
     val baseColor = Color.White.copy(alpha = 0.15f)
 
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -265,7 +270,13 @@ private fun BufferedProgressSlider(
             )
 
             // buffered track with subtle shadow glow
-            val bufferedEnd = end * max(bufferedFraction, progressFraction)
+            val playedEnd = end * progressFraction
+            var bufferedEnd = end * max(bufferedFraction, progressFraction)
+            // 如果缓冲只比已播放多一点点，给一个“最小可见宽度”，避免肉眼看不出来
+            val minExtraPx = 8.dp.toPx()
+            if (bufferedEnd > playedEnd && bufferedEnd - playedEnd < minExtraPx) {
+                bufferedEnd = min(end, playedEnd + minExtraPx)
+            }
             if (bufferedEnd > 0f) {
                 // 用“双层描边”模拟阴影/缓存光晕，避免依赖 nativeCanvas（不同 Compose 版本兼容性更好）
                 drawLine(
@@ -283,7 +294,6 @@ private fun BufferedProgressSlider(
             }
 
             // played track
-            val playedEnd = end * progressFraction
             if (playedEnd > 0f) {
                 drawLine(
                     color = playedColor,

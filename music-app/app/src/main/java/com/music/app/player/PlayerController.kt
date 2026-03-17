@@ -99,6 +99,9 @@ class PlayerController(private val context: Context) {
     private val _bufferedPositionMs = MutableStateFlow(0L)
     val bufferedPositionMs: StateFlow<Long> = _bufferedPositionMs.asStateFlow()
 
+    private val _bufferedPercentage = MutableStateFlow(0)
+    val bufferedPercentage: StateFlow<Int> = _bufferedPercentage.asStateFlow()
+
     private val _durationMs = MutableStateFlow(0L)
     val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
@@ -345,6 +348,7 @@ class PlayerController(private val context: Context) {
         try {
             val currentPosition = player.currentPosition.coerceAtLeast(0L)
             val bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
+            val bufferedPercent = player.bufferedPercentage.coerceIn(0, 100)
             val duration = player.duration.coerceAtLeast(0L)
             
             // 只有当值发生变化时才更新，避免不必要的状态更新
@@ -354,6 +358,10 @@ class PlayerController(private val context: Context) {
 
             if (_bufferedPositionMs.value != bufferedPosition) {
                 _bufferedPositionMs.value = bufferedPosition
+            }
+
+            if (_bufferedPercentage.value != bufferedPercent) {
+                _bufferedPercentage.value = bufferedPercent
             }
             
             // 更严格的时长更新条件

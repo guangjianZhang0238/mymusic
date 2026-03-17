@@ -65,6 +65,7 @@ data class MusicUiState(
     val albumSongsLoading: Boolean = false,
     val progressMs: Long = 0L,
     val bufferedPositionMs: Long = 0L,
+    val bufferedPercent: Int = 0,
     val durationMs: Long = 0L,
     val lyrics: List<LyricLine> = emptyList(),
     val currentLyricIndex: Int = 0,
@@ -207,6 +208,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     val song = playerController.currentSong.value
                     val progress = playerController.currentPositionMs.value
                     val bufferedPosition = playerController.bufferedPositionMs.value
+                    val bufferedPercent = playerController.bufferedPercentage.value
                     val duration = playerController.durationMs.value
                     val isPlaying = playerController.isPlaying.value
                     val playMode = playerController.playMode.value
@@ -223,6 +225,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         currentState.playMode != playMode ||
                         currentState.progressMs != progress ||
                         currentState.bufferedPositionMs != bufferedPosition ||
+                        currentState.bufferedPercent != bufferedPercent ||
                         currentState.durationMs != duration) {
 
                         val currentLyrics = currentState.lyrics
@@ -236,6 +239,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                             playMode = playMode,
                             progressMs = progress,
                             bufferedPositionMs = bufferedPosition,
+                            bufferedPercent = bufferedPercent,
                             durationMs = duration,
                             currentLyricIndex = lyricIndex
                         )
