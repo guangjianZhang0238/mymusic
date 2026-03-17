@@ -13,21 +13,21 @@ interface CachedSongDao {
     fun getAllCachedSongs(): Flow<List<CachedSongEntity>>
 
     @Query("SELECT * FROM cached_songs WHERE songId = :songId LIMIT 1")
-    suspend fun getCachedSong(songId: Long): CachedSongEntity?
+    fun getCachedSong(songId: Long): CachedSongEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(song: CachedSongEntity): Long
+    fun upsert(song: CachedSongEntity): Long
 
     @Query("DELETE FROM cached_songs WHERE songId = :songId")
-    suspend fun deleteBySongId(songId: Long): Int
+    fun deleteBySongId(songId: Long): Int
 
     @Query("DELETE FROM cached_songs")
-    suspend fun clearAll(): Int
+    fun clearAll(): Int
 
     @Query("SELECT COUNT(*) FROM cached_songs")
-    suspend fun getCount(): Int
+    fun getCount(): Int
 
     @Query("SELECT * FROM cached_songs ORDER BY cachedAt ASC LIMIT 1")
-    suspend fun getOldest(): CachedSongEntity?
+    fun getOldest(): CachedSongEntity?
 }
 

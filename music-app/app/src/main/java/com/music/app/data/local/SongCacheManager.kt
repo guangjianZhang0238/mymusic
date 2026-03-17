@@ -37,7 +37,7 @@ object SongCacheManager {
         return File(cacheDir(context), "song_${song.id}.$safeExt")
     }
 
-    suspend fun getAllCachedSongs(context: Context): kotlinx.coroutines.flow.Flow<List<CachedSongEntity>> {
+    fun getAllCachedSongs(context: Context): kotlinx.coroutines.flow.Flow<List<CachedSongEntity>> {
         return AppDatabase.getInstance(context).cachedSongDao().getAllCachedSongs()
     }
 
