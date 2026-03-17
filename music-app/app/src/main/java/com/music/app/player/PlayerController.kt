@@ -9,6 +9,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.datasource.DataSource
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
@@ -56,7 +57,7 @@ class PlayerController(private val context: Context) {
         .retryOnConnectionFailure(true)
         .build()
 
-    private val dataSourceFactory: DataSource.Factory =
+    private val upstreamFactory: DataSource.Factory =
         OkHttpDataSource.Factory(okHttpClient)
             .setUserAgent("MusicApp/1.0")
             .setDefaultRequestProperties(
@@ -65,6 +66,12 @@ class PlayerController(private val context: Context) {
                     "Icy-MetaData" to "1"
                 )
             )
+
+    /**
+     * 统一数据源：同时支持 http(s) 与 file/content 等本地 Uri
+     */
+    private val dataSourceFactory: DataSource.Factory =
+        DefaultDataSource.Factory(context, upstreamFactory)
     
     // 声道平衡处理器（可动态修改 balance 属性）
     val channelBalanceProcessor = ChannelBalanceAudioProcessor()
