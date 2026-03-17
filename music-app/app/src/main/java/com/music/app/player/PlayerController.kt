@@ -225,11 +225,7 @@ class PlayerController(private val context: Context) {
         }
 
         player.setMediaItems(mediaItems, startIndex, 0L)
-        player.repeatMode = if (_playMode.value == PlayMode.LOOP_ONE) {
-            Player.REPEAT_MODE_ONE
-        } else {
-            Player.REPEAT_MODE_ALL
-        }
+        player.repeatMode = if (_playMode.value == PlayMode.LOOP_ONE) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         player.prepare()
         player.playWhenReady = true
         syncCurrentSongByIndex()
@@ -334,7 +330,7 @@ class PlayerController(private val context: Context) {
         // 更新ExoPlayer的重复模式
         player.repeatMode = when (_playMode.value) {
             PlayMode.LOOP_ONE -> Player.REPEAT_MODE_ONE
-            else -> Player.REPEAT_MODE_ALL
+            else -> Player.REPEAT_MODE_OFF
         }
         // 如果切换到随机模式，生成新的随机索引
         if (_playMode.value == PlayMode.SHUFFLE && _playlist.value.isNotEmpty()) {

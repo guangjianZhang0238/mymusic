@@ -432,8 +432,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 currentIndex
             }
             else -> {
-                // 顺序播放和顺序循环
-                (currentIndex + 1) % playlist.size
+                // 顺序播放：到末尾停止
+                if (currentIndex >= playlist.lastIndex) return
+                currentIndex + 1
             }
         }
         
