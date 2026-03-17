@@ -16,13 +16,13 @@ interface CachedSongDao {
     suspend fun getCachedSong(songId: Long): CachedSongEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(song: CachedSongEntity)
+    suspend fun upsert(song: CachedSongEntity): Long
 
     @Query("DELETE FROM cached_songs WHERE songId = :songId")
-    suspend fun deleteBySongId(songId: Long)
+    suspend fun deleteBySongId(songId: Long): Int
 
     @Query("DELETE FROM cached_songs")
-    suspend fun clearAll()
+    suspend fun clearAll(): Int
 
     @Query("SELECT COUNT(*) FROM cached_songs")
     suspend fun getCount(): Int
