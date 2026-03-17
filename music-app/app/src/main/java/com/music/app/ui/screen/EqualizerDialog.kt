@@ -101,7 +101,7 @@ fun EqualizerDialog(
                             )
                         )
                     )
-                    .padding(horizontal = 12.dp, top = 8.dp, bottom = 16.dp)
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)
             ) {
                 // 使用 Column 进行垂直布局，每个模块独占一行
                 Column(

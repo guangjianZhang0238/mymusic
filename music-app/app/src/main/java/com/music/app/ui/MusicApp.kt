@@ -194,7 +194,13 @@ fun MusicApp(viewModel: MusicViewModel = viewModel()) {
                 .padding(innerPadding)
                 .background(userSettings.backgroundColor)
         ) {
-            composable("home") { HomeScreen(viewModel = viewModel) }
+            composable("home") {
+                HomeScreen(
+                    viewModel = viewModel,
+                    onNavigate = { route -> navController.navigate(route) },
+                    onOpenPlayer = { showPlayerDialog = true }
+                )
+            }
             composable("discover") {
                 DiscoverScreen(
                     viewModel = viewModel, 
