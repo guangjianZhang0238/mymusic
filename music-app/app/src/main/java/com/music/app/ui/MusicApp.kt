@@ -132,7 +132,11 @@ fun MusicApp(viewModel: MusicViewModel = viewModel()) {
     if (showPlayerDialog && uiState.currentSong != null) {
         PlayerDialog(
             viewModel = viewModel,
-            onDismiss = { showPlayerDialog = false }
+            onDismiss = { showPlayerDialog = false },
+            onOpenPlaybackPlaylist = {
+                showPlayerDialog = false
+                navController.navigate("playbackPlaylist")
+            }
         )
     }
 
@@ -417,7 +421,8 @@ fun formatMs(ms: Long): String {
 @Composable
 fun PlayerDialog(
     viewModel: MusicViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onOpenPlaybackPlaylist: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -517,6 +522,11 @@ fun PlayerDialog(
                                 }
                             ) {
                                 Icon(Icons.Default.Tune, contentDescription = "效果器", tint = Color.White)
+                            }
+                            IconButton(
+                                onClick = onOpenPlaybackPlaylist
+                            ) {
+                                Icon(Icons.Default.PlaylistPlay, contentDescription = "播放列表", tint = Color.White)
                             }
                         }
                     }

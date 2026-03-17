@@ -19,6 +19,8 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.music.app.data.remote.SongDto
 import com.music.app.data.remote.TokenStore
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -106,6 +108,9 @@ class PlayerController(private val context: Context) {
     private val _playMode = MutableStateFlow(PlayMode.SEQUENCE)
     val playMode: StateFlow<PlayMode> = _playMode.asStateFlow()
 
+    private val _songEndedEvents = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+    val songEndedEvents: SharedFlow<Long> = _songEndedEvents
+
     private var shuffledIndices: List<Int> = emptyList()
     private var equalizer: Equalizer? = null
     private val eqFrequencies = intArrayOf(100, 200, 400, 600, 1000, 3000, 6000, 12000, 14000, 16000)
@@ -129,6 +134,12 @@ class PlayerController(private val context: Context) {
                 if (playbackState == Player.STATE_ENDED && _playMode.value == PlayMode.LOOP_ONE) {
                     player.seekTo(0)
                     player.play()
+                }
+
+                if (playbackState == Player.STATE_ENDED && _playMode.value != PlayMode.LOOP_ONE) {
+                    _currentSong.value?.id?.let { endedSongId ->
+                        _songEndedEvents.tryEmit(endedSongId)
+                    }
                 }
                 // 处理播放错误状态
                 if (playbackState == Player.STATE_IDLE || playbackState == Player.STATE_ENDED) {

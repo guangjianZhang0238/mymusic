@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import android.widget.Toast
@@ -146,7 +147,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun observePlayer() {
         viewModelScope.launch {
             var lastSongId: Long? = null
-            var handledEndForSong = false
             while (true) {
                 try {
                     playerController.syncProgress()
@@ -159,10 +159,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     // 只有当值真正改变时才更新UI状态，减少不必要的重组
                     val currentState = _uiState.value
                     
-                    // 当歌曲变化时，重置「已处理结尾」标记
                     if (song?.id != lastSongId) {
                         lastSongId = song?.id
-                        handledEndForSong = false
                     }
                     
                     if (currentState.currentSong != song ||
@@ -186,20 +184,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         )
                     }
 
-                    // 自动切到下一首：当前歌曲自然播放结束时，复用现有的切歌逻辑
-                    val shouldAutoNext =
-                        song != null &&
-                        !isPlaying &&
-                        duration > 0 &&
-                        progress >= (duration - 1000L).coerceAtLeast(0L) &&
-                        !handledEndForSong &&
-                        playMode != PlayMode.LOOP_ONE
-
-                    if (shouldAutoNext) {
-                        handledEndForSong = true
-                        nextSong()
-                    }
-
                     // 当歌曲改变时，自动加载歌词
                     if (currentState.currentSong != song && song != null) {
                         loadLyricsForSong(song)
@@ -213,6 +197,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     delay(800)
                 }
             }
+        }
+
+        viewModelScope.launch {
+            var lastHandledEndedSongId: Long? = null
+            playerController.songEndedEvents
+                .distinctUntilChanged()
+                .collect { endedSongId ->
+                    if (lastHandledEndedSongId == endedSongId) return@collect
+                    lastHandledEndedSongId = endedSongId
+                    nextSong()
+                }
         }
     }
 
