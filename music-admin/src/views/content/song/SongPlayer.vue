@@ -26,6 +26,9 @@
             <el-button @click="handleComment">
               <el-icon><ChatDotRound /></el-icon> 评论
             </el-button>
+            <el-button @click="playlistVisible = true">
+              <el-icon><List /></el-icon> 播放列表
+            </el-button>
           </div>
         </div>
       </div>
@@ -142,13 +145,45 @@
         </div>
       </div>
     </div>
+    
+    <el-drawer
+      v-model="playlistVisible"
+      title="播放列表"
+      direction="rtl"
+      size="30%"
+    >
+      <template #default>
+        <div v-if="!playlist || playlist.length === 0" class="playlist-empty">
+          <span>当前没有可用的播放列表</span>
+        </div>
+        <el-scrollbar v-else class="playlist-scroll">
+          <div
+            v-for="item in playlist"
+            :key="item.id"
+            :class="['playlist-item', { 'is-current': item.id === song.id }]"
+          >
+            <div class="playlist-title">
+              {{ item.title }}
+            </div>
+            <div class="playlist-sub">
+              <span class="playlist-artist">
+                {{ item.artistNames || item.artistName || '未知歌手' }}
+              </span>
+              <span v-if="item.albumName" class="playlist-album">
+                · {{ item.albumName }}
+              </span>
+            </div>
+          </div>
+        </el-scrollbar>
+      </template>
+    </el-drawer>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Star, StarFilled, ChatDotRound, Reading, ChatLineRound, VideoPlay, VideoPause } from '@element-plus/icons-vue'
+import { Star, StarFilled, ChatDotRound, Reading, ChatLineRound, VideoPlay, VideoPause, List } from '@element-plus/icons-vue'
 import request from '@/api/request'
 
 // Props
@@ -160,6 +195,10 @@ const props = defineProps({
   song: {
     type: Object,
     default: () => ({})
+  },
+  playlist: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -184,6 +223,7 @@ const newComment = ref('')
 const isLiked = ref(false)
 const isFirstSong = ref(true)
 const isLastSong = ref(true)
+const playlistVisible = ref(false)
 
 // Refs
 const lyricsContent = ref<HTMLElement>()
@@ -689,6 +729,43 @@ onMounted(async () => {
 
 .song-actions {
   margin-top: 20px;
+}
+
+.playlist-empty {
+  padding: 16px;
+  color: #909399;
+  font-size: 13px;
+}
+
+.playlist-scroll {
+  max-height: 480px;
+}
+
+.playlist-item {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: default;
+  transition: background-color 0.2s ease;
+}
+
+.playlist-item + .playlist-item {
+  margin-top: 6px;
+}
+
+.playlist-item.is-current {
+  background-color: #ecf5ff;
+}
+
+.playlist-title {
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.playlist-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #909399;
 }
 
 .player-controls {

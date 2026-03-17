@@ -1,8 +1,12 @@
 package com.music.content.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.music.api.dto.BatchSongIdsDTO;
+import com.music.api.dto.BatchSwitchArtistDTO;
 import com.music.api.dto.SongDTO;
 import com.music.api.dto.SongQueryDTO;
+import com.music.api.vo.BatchOperationResultVO;
+import com.music.api.vo.BatchSwitchArtistResultVO;
 import com.music.api.vo.SongVO;
 import com.music.common.core.domain.Result;
 import com.music.content.service.SongService;
@@ -52,6 +56,18 @@ public class SongController {
     public Result<Void> delete(@PathVariable Long id) {
         songService.delete(id);
         return Result.success();
+    }
+
+    @Operation(summary = "批量删除歌曲（含清理关联关系）")
+    @PostMapping("/batch-delete")
+    public Result<BatchOperationResultVO> batchDelete(@RequestBody BatchSongIdsDTO dto) {
+        return Result.success(songService.batchDelete(dto));
+    }
+
+    @Operation(summary = "批量切换歌曲歌手（可选专辑，空则默认专辑；含文件迁移与路径同步）")
+    @PostMapping("/batch-switch-artist")
+    public Result<BatchSwitchArtistResultVO> batchSwitchArtist(@RequestBody BatchSwitchArtistDTO dto) {
+        return Result.success(songService.batchSwitchArtist(dto));
     }
     
     @Operation(summary = "获取热门歌曲")

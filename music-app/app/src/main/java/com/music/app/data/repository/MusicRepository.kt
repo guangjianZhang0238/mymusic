@@ -303,7 +303,18 @@ class MusicRepository {
     }
 
     suspend fun getCurrentUser(): LoginResponse? = try {
-        api.getCurrentUser().data
+        val result = api.getCurrentUser()
+        if (result.code == 200) result.data else null
+    } catch (_: Exception) {
+        null
+    }
+
+    /**
+     * 获取「当前用户」的完整响应（含 code/message），用于判断是否需要清理本地登录态。
+     * 注意：网络异常会返回 null（此时不应清 token）。
+     */
+    suspend fun getCurrentUserResult(): com.music.app.data.remote.ApiResult<LoginResponse>? = try {
+        api.getCurrentUser()
     } catch (_: Exception) {
         null
     }

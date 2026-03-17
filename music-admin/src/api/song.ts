@@ -35,6 +35,21 @@ export const deleteSong = (id: number) => {
   return request.delete(`/song/${id}`)
 }
 
+// 批量删除歌曲（含关系表清理，由后端保证）
+export const batchDeleteSongs = (songIds: number[]) => {
+  return request.post<any>('/song/batch-delete', { songIds })
+}
+
+// 批量切换歌手（专辑可不填：默认专辑）
+export const batchSwitchArtist = (data: {
+  songIds: number[]
+  targetArtistId: number
+  targetArtistName: string
+  targetAlbumName?: string | null
+}) => {
+  return request.post<any>('/song/batch-switch-artist', data)
+}
+
 // 获取热门歌曲
 export const getHotSongs = () => {
   return request.get<SongVO[]>('/song/hot')

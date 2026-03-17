@@ -3,7 +3,9 @@ package com.music.content.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.music.api.dto.AlbumDTO;
 import com.music.api.dto.AlbumSongBindDTO;
+import com.music.api.dto.SwitchAlbumArtistDTO;
 import com.music.api.vo.AlbumVO;
+import com.music.api.vo.SwitchAlbumArtistResultVO;
 import com.music.common.core.domain.Result;
 import com.music.content.service.AlbumService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,5 +64,12 @@ public class AlbumController {
                                   @RequestBody AlbumSongBindDTO dto) {
         albumService.bindSongs(albumId, dto != null ? dto.getSongIds() : null);
         return Result.success();
+    }
+
+    @Operation(summary = "切换专辑歌手（迁移文件夹并同步路径）")
+    @PostMapping("/{albumId}/switch-artist")
+    public Result<SwitchAlbumArtistResultVO> switchArtist(@PathVariable Long albumId,
+                                                          @RequestBody SwitchAlbumArtistDTO dto) {
+        return Result.success(albumService.switchArtist(albumId, dto));
     }
 }

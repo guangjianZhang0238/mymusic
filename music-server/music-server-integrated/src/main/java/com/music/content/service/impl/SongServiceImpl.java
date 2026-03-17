@@ -3,26 +3,40 @@ package com.music.content.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.music.api.dto.BatchSongIdsDTO;
+import com.music.api.dto.BatchSwitchArtistDTO;
 import com.music.api.dto.SongDTO;
 import com.music.api.dto.SongQueryDTO;
+import com.music.api.vo.BatchOperationResultVO;
+import com.music.api.vo.BatchSwitchArtistResultVO;
 import com.music.api.vo.SongVO;
 import com.music.common.exception.BusinessException;
 import com.music.common.utils.FileUtils;
 import com.music.content.entity.Album;
 import com.music.content.entity.Artist;
+import com.music.content.entity.AlbumSong;
 import com.music.content.entity.Song;
+import com.music.content.entity.SongArtist;
 import com.music.content.mapper.AlbumMapper;
+import com.music.content.mapper.AlbumSongMapper;
 import com.music.content.mapper.ArtistMapper;
+import com.music.content.mapper.SongArtistMapper;
 import com.music.content.mapper.SongMapper;
 import com.music.content.service.LyricsService;
 import com.music.content.service.SongService;
+import com.music.file.config.StorageConfig;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -30,7 +44,10 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
     
     private final ArtistMapper artistMapper;
     private final AlbumMapper albumMapper;
+    private final SongArtistMapper songArtistMapper;
+    private final AlbumSongMapper albumSongMapper;
     private final LyricsService lyricsService;
+    private final StorageConfig storageConfig;
     
     @Value("${lyrics.path}")
     private String lyricsApiPath;
@@ -161,6 +178,218 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
     public void delete(Long id) {
         removeById(id);
     }
+
+    @Override
+    public BatchOperationResultVO batchDelete(BatchSongIdsDTO dto) {
+        BatchOperationResultVO result = new BatchOperationResultVO();
+        if (dto == null || dto.getSongIds() == null || dto.getSongIds().isEmpty()) {
+            return result;
+        }
+
+        for (Long songId : dto.getSongIds()) {
+            if (songId == null) {
+                continue;
+            }
+            try {
+                Song song = getById(songId);
+                if (song == null) {
+                    result.getSkipList().add(BatchOperationResultVO.SkipItem.of(songId, "歌曲不存在"));
+                    continue;
+                }
+
+                // 1) 删除歌曲-歌手关联
+                LambdaQueryWrapper<SongArtist> saWrapper = new LambdaQueryWrapper<>();
+                saWrapper.eq(SongArtist::getSongId, songId);
+                songArtistMapper.delete(saWrapper);
+
+                // 2) 删除专辑-歌曲关联（多对多）
+                LambdaQueryWrapper<AlbumSong> asWrapper = new LambdaQueryWrapper<>();
+                asWrapper.eq(AlbumSong::getSongId, songId);
+                albumSongMapper.delete(asWrapper);
+
+                // 3) 删除歌曲主记录（歌词记录保留，由清理任务/歌词模块处理）
+                removeById(songId);
+                result.getSuccessList().add(songId);
+            } catch (Exception e) {
+                result.getSkipList().add(BatchOperationResultVO.SkipItem.of(songId, e.getMessage() == null ? "删除失败" : e.getMessage()));
+            }
+        }
+
+        return result;
+    }
+
+    @Override
+    public BatchSwitchArtistResultVO batchSwitchArtist(BatchSwitchArtistDTO dto) {
+        BatchSwitchArtistResultVO result = new BatchSwitchArtistResultVO();
+        if (dto == null || dto.getSongIds() == null || dto.getSongIds().isEmpty()) {
+            return result;
+        }
+        if (dto.getTargetArtistId() == null) {
+            throw BusinessException.of("目标歌手ID不能为空");
+        }
+
+        // 解析/创建目标专辑（空则默认专辑）。这里不依赖 MusicMetadataService，避免循环依赖。
+        Album targetAlbum = getOrCreateAlbum(dto.getTargetArtistId(), dto.getTargetAlbumName());
+        if (targetAlbum == null || !StringUtils.hasText(targetAlbum.getFolderPath())) {
+            throw BusinessException.of("目标专辑目录路径为空");
+        }
+
+        for (Long songId : dto.getSongIds()) {
+            if (songId == null) continue;
+
+            try {
+                Song song = getById(songId);
+                if (song == null) {
+                    result.getSkipList().add(BatchSwitchArtistResultVO.SkipItem.of(songId, "歌曲不存在"));
+                    continue;
+                }
+                String oldPath = song.getFilePath();
+                if (!StringUtils.hasText(oldPath)) {
+                    result.getSkipList().add(BatchSwitchArtistResultVO.SkipItem.of(songId, "歌曲文件路径为空"));
+                    continue;
+                }
+
+                File sourceFile = toAbsoluteFile(oldPath);
+                if (sourceFile == null || !sourceFile.exists() || !sourceFile.isFile()) {
+                    result.getSkipList().add(BatchSwitchArtistResultVO.SkipItem.of(songId, "源文件不存在"));
+                    continue;
+                }
+
+                String fileName = sourceFile.getName();
+                String targetFolder = normalizeToSlash(targetAlbum.getFolderPath());
+                String newRelativePath = targetFolder + "/" + fileName;
+
+                File targetFile = new File(storageConfig.getBasePath(), newRelativePath.replace("/", File.separator));
+                if (targetFile.exists()) {
+                    result.getSkipList().add(BatchSwitchArtistResultVO.SkipItem.of(songId, "目标路径已存在，已跳过"));
+                    continue;
+                }
+                // 确保目标目录存在
+                File parent = targetFile.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    result.getSkipList().add(BatchSwitchArtistResultVO.SkipItem.of(songId, "无法创建目标目录"));
+                    continue;
+                }
+
+                // 移动文件
+                moveFile(sourceFile.toPath(), targetFile.toPath());
+
+                // 更新DB：主表 + 关系表
+                song.setArtistId(dto.getTargetArtistId());
+                song.setAlbumId(targetAlbum.getId());
+                song.setFilePath(newRelativePath);
+                updateById(song);
+
+                // 专辑收录关系：改为只保留目标专辑
+                albumSongMapper.delete(new LambdaQueryWrapper<AlbumSong>().eq(AlbumSong::getSongId, songId));
+                AlbumSong link = new AlbumSong();
+                link.setAlbumId(targetAlbum.getId());
+                link.setSongId(songId);
+                albumSongMapper.insert(link);
+
+                result.getSuccessList().add(BatchSwitchArtistResultVO.SuccessItem.of(songId, oldPath, newRelativePath));
+            } catch (Exception e) {
+                result.getSkipList().add(BatchSwitchArtistResultVO.SkipItem.of(songId, e.getMessage() == null ? "切换失败" : e.getMessage()));
+            }
+        }
+
+        return result;
+    }
+
+    private Album getOrCreateAlbum(Long artistId, String albumName) {
+        if (artistId == null) {
+            throw BusinessException.of("目标歌手ID不能为空");
+        }
+        String name = StringUtils.hasText(albumName) ? albumName.trim() : "默认";
+
+        // 1) 精确匹配（同歌手下同名专辑）
+        LambdaQueryWrapper<Album> exact = new LambdaQueryWrapper<>();
+        exact.eq(Album::getArtistId, artistId).eq(Album::getName, name);
+        Album existing = albumMapper.selectOne(exact);
+        if (existing != null) {
+            return existing;
+        }
+
+        // 2) 模糊匹配（去空格）
+        String clean = name.replaceAll("\\s+", "");
+        LambdaQueryWrapper<Album> fuzzy = new LambdaQueryWrapper<>();
+        fuzzy.eq(Album::getArtistId, artistId).apply("REPLACE(name, ' ', '') = {0}", clean);
+        existing = albumMapper.selectOne(fuzzy);
+        if (existing != null) {
+            return existing;
+        }
+
+        // 3) 创建新专辑 + 创建目录
+        Artist artist = artistMapper.selectById(artistId);
+        if (artist == null || !StringUtils.hasText(artist.getName())) {
+            throw BusinessException.of("目标歌手不存在");
+        }
+
+        String folderPath = ensureAlbumDirectoryExists(artist.getName(), name);
+
+        Album album = new Album();
+        album.setArtistId(artistId);
+        album.setName(name);
+        album.setFolderPath(folderPath);
+        album.setAlbumType(0);
+        album.setSortOrder(0);
+        album.setStatus(1);
+        albumMapper.insert(album);
+        return album;
+    }
+
+    private String ensureAlbumDirectoryExists(String artistName, String albumName) {
+        if (!StringUtils.hasText(artistName)) {
+            throw BusinessException.of("歌手名称不能为空");
+        }
+
+        String artistDir = sanitizeDirectoryName(artistName);
+        String albumDir = StringUtils.hasText(albumName) ? sanitizeDirectoryName(albumName) : "默认";
+        File dir = new File(storageConfig.getBasePath(), artistDir + File.separator + albumDir);
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw BusinessException.of("无法创建专辑目录: " + dir.getAbsolutePath());
+        }
+
+        // DB 中统一用 "/" 分隔
+        return (artistDir + "/" + albumDir).replace("\\", "/");
+    }
+
+    private String sanitizeDirectoryName(String name) {
+        if (!StringUtils.hasText(name)) {
+            return "Unknown";
+        }
+        return name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    }
+
+    private File toAbsoluteFile(String filePath) {
+        if (!StringUtils.hasText(filePath)) {
+            return null;
+        }
+        File f = new File(filePath);
+        if (f.isAbsolute()) {
+            return f;
+        }
+        String rel = filePath.replace("/", File.separator).replace("\\", File.separator);
+        return new File(storageConfig.getBasePath(), rel);
+    }
+
+    private String normalizeToSlash(String path) {
+        if (!StringUtils.hasText(path)) return "";
+        String p = path.replace("\\", "/");
+        while (p.endsWith("/")) {
+            p = p.substring(0, p.length() - 1);
+        }
+        return p;
+    }
+
+    private void moveFile(Path source, Path target) throws Exception {
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE);
+        } catch (Exception e) {
+            // Windows/跨盘等可能不支持 ATOMIC_MOVE，降级
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
     
     @Override
     public void incrementPlayCount(Long id) {
@@ -274,6 +503,7 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
     }
     
     private SongVO convertToVO(Song song) {
+        Objects.requireNonNull(song, "song");
         SongVO vo = new SongVO();
         BeanUtils.copyProperties(song, vo);
         

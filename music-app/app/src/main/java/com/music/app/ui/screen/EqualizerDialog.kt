@@ -101,7 +101,7 @@ fun EqualizerDialog(
                             )
                         )
                     )
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 12.dp, top = 8.dp, bottom = 16.dp)
             ) {
                 // 使用 Column 进行垂直布局，每个模块独占一行
                 Column(
@@ -333,7 +333,7 @@ fun EqualizerDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth(0.5f)
-                                        .height(40.dp)
+                                        .height(30.dp)
                                         .align(Alignment.CenterStart)
                                         .background(
                                             Color(0xFF1E90FF).copy(alpha = 0.3f),
@@ -345,7 +345,7 @@ fun EqualizerDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth(0.5f)
-                                        .height(40.dp)
+                                        .height(30.dp)
                                         .align(Alignment.CenterEnd)
                                         .background(
                                             Color(0xFFFF4757).copy(alpha = 0.3f),

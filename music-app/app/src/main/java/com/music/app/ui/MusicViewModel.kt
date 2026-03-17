@@ -22,6 +22,7 @@ import com.music.app.data.remote.LyricsShareDto
 import com.music.app.data.remote.UserSettingDto
 import com.music.app.data.remote.UserSettings
 import com.music.app.data.remote.EqualizerSettings
+import com.music.app.data.remote.UserSettingsStore
 import com.music.app.data.repository.MusicRepository
 import com.music.app.player.PlayMode
 import com.music.app.ui.equalizer.EqualizerPreset
@@ -646,27 +647,51 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadUserSettings() {
         viewModelScope.launch {
-            val settingsList = repository.getUserSettings()
-            val settings = UserSettings(
-                equalizer = EqualizerSettings(
-                    enabled = settingsList.find { it.settingKey == "equalizer_enabled" }?.settingValue?.toBoolean() ?: false,
-                    preset = settingsList.find { it.settingKey == "equalizer_preset" }?.settingValue ?: "",
-                    masterGainDb = settingsList.find { it.settingKey == "equalizer_master_gain" }?.settingValue?.toFloatOrNull() ?: 0f,
-                    stereoBalance = settingsList.find { it.settingKey == "equalizer_stereo_balance" }?.settingValue?.toFloatOrNull() ?: 0f,
-                    bandGainsDb = settingsList.filter { it.settingKey.startsWith("equalizer_band_") }
-                        .sortedBy { it.settingKey }
-                        .mapNotNull { it.settingValue.toFloatOrNull() }
-                        .take(10)
-                        .let { if (it.size < 10) it + List(10 - it.size) { 0f } else it },
-                    pitchShiftSemitones = settingsList.find { it.settingKey == "equalizer_pitch_semitones" }
-                        ?.settingValue
-                        ?.toIntOrNull()
-                        ?: 0
-                )
-            )
-            _userSettings.value = settings
-            _uiState.value = _uiState.value.copy(equalizerSettings = settings.equalizer ?: EqualizerSettings())
+            val app = getApplication<Application>()
+            val userId = TokenStore.getUserId(app)
+
+            // 1) 先用本地缓存（若有）立刻渲染，保证设置页与设备端缓存关联且离线可用
+            if (userId != null) {
+                val cachedList = UserSettingsStore.loadRawSettings(app, userId)
+                if (!cachedList.isNullOrEmpty()) {
+                    applySettingsListToState(cachedList)
+                }
+            }
+
+            // 2) 再拉取服务端设置并回写本地缓存（登录态有效时）
+            val token = TokenStore.getToken(app)
+            if (!token.isNullOrBlank() && TokenStore.isWithin15Days(app)) {
+                val settingsList = repository.getUserSettings()
+                if (settingsList.isNotEmpty()) {
+                    if (userId != null) {
+                        UserSettingsStore.saveRawSettings(app, userId, settingsList)
+                    }
+                    applySettingsListToState(settingsList)
+                }
+            }
         }
+    }
+
+    private fun applySettingsListToState(settingsList: List<UserSettingDto>) {
+        val settings = UserSettings(
+            equalizer = EqualizerSettings(
+                enabled = settingsList.find { it.settingKey == "equalizer_enabled" }?.settingValue?.toBoolean() ?: false,
+                preset = settingsList.find { it.settingKey == "equalizer_preset" }?.settingValue ?: "",
+                masterGainDb = settingsList.find { it.settingKey == "equalizer_master_gain" }?.settingValue?.toFloatOrNull() ?: 0f,
+                stereoBalance = settingsList.find { it.settingKey == "equalizer_stereo_balance" }?.settingValue?.toFloatOrNull() ?: 0f,
+                bandGainsDb = settingsList.filter { it.settingKey.startsWith("equalizer_band_") }
+                    .sortedBy { it.settingKey }
+                    .mapNotNull { it.settingValue.toFloatOrNull() }
+                    .take(10)
+                    .let { if (it.size < 10) it + List(10 - it.size) { 0f } else it },
+                pitchShiftSemitones = settingsList.find { it.settingKey == "equalizer_pitch_semitones" }
+                    ?.settingValue
+                    ?.toIntOrNull()
+                    ?: 0
+            )
+        )
+        _userSettings.value = settings
+        _uiState.value = _uiState.value.copy(equalizerSettings = settings.equalizer ?: EqualizerSettings())
     }
 
     fun updateUserSettings(settings: UserSettings, immediate: Boolean = false) {
@@ -911,12 +936,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         loginLoading = false
                     )
                     Toast.makeText(app, "登录成功", Toast.LENGTH_SHORT).show()
+                    // 登录成功后立即校验/刷新登录态，确保每次登录都能校验登录情况
+                    validateTokenAndLoadData()
                     // 登录成功后加载用户数据
                     loadUserPlaylists()
                     loadFavoriteSongIds()
                     loadRecentPlayedSongs()
                     // 加载播放列表
                     loadPlaybackPlaylist()
+                    // 同步设置：先用本地缓存再拉取服务端（与登录用户关联）
+                    loadUserSettings()
                 } else {
                     _uiState.value = _uiState.value.copy(
                         loginError = "登录失败",

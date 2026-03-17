@@ -111,6 +111,14 @@
           </el-button>
           <el-button
             size="small"
+            type="warning"
+            plain
+            @click.stop="openSwitchArtistDialog(scope.row)"
+          >
+            切换歌手
+          </el-button>
+          <el-button
+            size="small"
             type="primary"
             plain
             @click.stop="openBindSongsDialog(scope.row)"
@@ -270,6 +278,14 @@
         </span>
       </template>
     </el-dialog>
+
+    <SwitchArtistAlbumDialog
+      v-model:visible="switchArtistDialogVisible"
+      title="切换专辑歌手"
+      confirm-text="开始切换"
+      :show-album="false"
+      @confirm="confirmSwitchAlbumArtist"
+    />
   </div>
 </template>
 
@@ -283,6 +299,7 @@ import * as artistApi from '@/api/artist'
 import * as songApi from '@/api/song'
 import request from '@/api/request'
 import LyricsEditorDialog from './LyricsEditorDialog.vue'
+import SwitchArtistAlbumDialog from '@/components/SwitchArtistAlbumDialog.vue'
 
 const userStore = useUserStore()
 const token = computed(() => userStore.token)
@@ -322,6 +339,10 @@ const bindSongSearchKeyword = ref('')
 const bindSongList = ref<any[]>([])
 const bindSelectedSongIds = ref<number[]>([])
 const bindSongLoading = ref(false)
+
+// 切换歌手对话框相关
+const switchArtistDialogVisible = ref(false)
+const currentAlbumForSwitch = ref<any | null>(null)
 
 const albumRules = {
   name: [
@@ -516,6 +537,46 @@ const handleStatusChange = async (album: any) => {
   } catch (error) {
     album.status = album.status === 1 ? 0 : 1
     ElMessage.error('状态更新失败')
+  }
+}
+
+const openSwitchArtistDialog = (album: any) => {
+  if (!album?.id) return
+  currentAlbumForSwitch.value = album
+  switchArtistDialogVisible.value = true
+}
+
+const confirmSwitchAlbumArtist = async (payload: { artistId: number; artistName: string }) => {
+  const album = currentAlbumForSwitch.value
+  if (!album?.id) {
+    ElMessage.error('专辑信息无效')
+    return
+  }
+
+  await ElMessageBox.confirm(
+    `确定要将专辑《${formatName(album.name, album.nameEn)}》切换到歌手「${payload.artistName}」吗？\n该操作会迁移专辑文件夹并同步路径。`,
+    '确认操作',
+    {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  )
+
+  try {
+    const res = await albumApi.switchAlbumArtist(album.id, {
+      targetArtistId: payload.artistId,
+      targetArtistName: payload.artistName
+    })
+    if (res && res.success === false) {
+      ElMessage.error(res.reason || '切换失败')
+      return
+    }
+    ElMessage.success('切换成功')
+    switchArtistDialogVisible.value = false
+    await loadAlbums()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '切换歌手失败')
   }
 }
 

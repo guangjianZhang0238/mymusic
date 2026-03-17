@@ -32,6 +32,22 @@
         >
           将选中歌曲加入专辑
         </el-button>
+        <el-button
+          style="margin-left: 10px"
+          type="warning"
+          plain
+          @click="openBatchSwitchArtistDialog"
+        >
+          批量修改歌手
+        </el-button>
+        <el-button
+          style="margin-left: 10px"
+          type="danger"
+          plain
+          @click="handleBatchDelete"
+        >
+          批量删除
+        </el-button>
       </div>
     </div>
     
@@ -219,6 +235,7 @@
     <SongPlayer 
       v-model:visible="playerVisible" 
       :song="currentSong"
+      :playlist="songList"
     />
 
     <!-- 批量加入专辑对话框 -->
@@ -254,6 +271,14 @@
         </span>
       </template>
     </el-dialog>
+
+    <SwitchArtistAlbumDialog
+      v-model:visible="batchSwitchDialogVisible"
+      title="批量修改歌手"
+      confirm-text="开始修改"
+      :show-album="true"
+      @confirm="confirmBatchSwitchArtist"
+    />
   </div>
 </template>
 
@@ -268,6 +293,7 @@ import * as albumApi from '@/api/album'
 import request from '@/api/request'
 import SongPlayer from './SongPlayer.vue'
 import LyricsTimingEditorDialog from './LyricsTimingEditorDialog.vue'
+import SwitchArtistAlbumDialog from '@/components/SwitchArtistAlbumDialog.vue'
 
 const userStore = useUserStore()
 const token = computed(() => userStore.token)
@@ -316,6 +342,9 @@ const selectedSongs = ref<any[]>([])
 const addToAlbumDialogVisible = ref(false)
 const addToAlbumTargetAlbumId = ref<number | null>(null)
 const addToAlbumSongIds = ref<number[]>([])
+
+// 批量切换歌手
+const batchSwitchDialogVisible = ref(false)
 
 // 歌曲播放器相关
 const playerVisible = ref(false)
@@ -438,6 +467,96 @@ const confirmAddSongsToAlbum = async () => {
     await loadSongs()
   } catch (error: any) {
     ElMessage.error(error.message || '加入专辑失败')
+  }
+}
+
+const openBatchSwitchArtistDialog = () => {
+  if (!selectedSongs.value.length) {
+    ElMessage.warning('请先选择要修改的歌曲')
+    return
+  }
+  batchSwitchDialogVisible.value = true
+}
+
+const confirmBatchSwitchArtist = async (payload: { artistId: number; artistName: string; albumName?: string | null }) => {
+  const songIds = selectedSongs.value
+    .map((s: any) => s.id)
+    .filter((id: any) => typeof id === 'number')
+
+  if (!songIds.length) {
+    ElMessage.warning('选中的歌曲数据无效')
+    return
+  }
+
+  try {
+    const res = await songApi.batchSwitchArtist({
+      songIds,
+      targetArtistId: payload.artistId,
+      targetArtistName: payload.artistName,
+      targetAlbumName: payload.albumName ?? null
+    })
+
+    const successCount = (res?.successList?.length ?? res?.successCount ?? 0) as number
+    const skipCount = (res?.skipList?.length ?? res?.skipCount ?? 0) as number
+
+    if (skipCount > 0) {
+      const skipPreview = (res?.skipList || [])
+        .slice(0, 10)
+        .map((it: any) => `${it.id}: ${it.reason}`)
+        .join('\n')
+      await ElMessageBox.alert(
+        `批量修改完成：成功 ${successCount} 条，跳过 ${skipCount} 条。\n\n跳过明细（最多展示10条）：\n${skipPreview || '(无明细)'}\n\n提示：跳过通常由“目标路径已存在/源文件不存在/校验失败”等导致。`,
+        '已完成',
+        { type: 'warning' }
+      )
+    } else {
+      ElMessage.success(`批量修改完成：成功 ${successCount} 条`)
+    }
+    await loadSongs()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '批量修改歌手失败')
+  }
+}
+
+const handleBatchDelete = async () => {
+  const songIds = selectedSongs.value
+    .map((s: any) => s.id)
+    .filter((id: any) => typeof id === 'number')
+  if (!songIds.length) {
+    ElMessage.warning('请先选择要删除的歌曲')
+    return
+  }
+
+  await ElMessageBox.confirm(
+    `确定要批量删除选中的 ${songIds.length} 首歌曲吗？此操作会同时清理关联关系。`,
+    '警告',
+    {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    }
+  )
+
+  try {
+    const res = await songApi.batchDeleteSongs(songIds)
+    const successCount = (res?.successList?.length ?? res?.successCount ?? 0) as number
+    const skipCount = (res?.skipList?.length ?? res?.skipCount ?? 0) as number
+    if (skipCount > 0) {
+      const skipPreview = (res?.skipList || [])
+        .slice(0, 10)
+        .map((it: any) => `${it.id}: ${it.reason}`)
+        .join('\n')
+      await ElMessageBox.alert(
+        `批量删除完成：成功 ${successCount} 条，跳过 ${skipCount} 条。\n\n跳过明细（最多展示10条）：\n${skipPreview || '(无明细)'}`,
+        '已完成',
+        { type: 'warning' }
+      )
+    } else {
+      ElMessage.success(`批量删除完成：成功 ${successCount} 条`)
+    }
+    await loadSongs()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '批量删除失败')
   }
 }
 

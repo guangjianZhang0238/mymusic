@@ -39,3 +39,8 @@ export const bindAlbumSongs = (albumId: number, songIds: number[]) => {
     songIds,
   })
 }
+
+// 切换专辑歌手（迁移专辑文件夹并同步路径）
+export const switchAlbumArtist = (albumId: number, data: { targetArtistId: number; targetArtistName: string }) => {
+  return request.post<any>(`/album/${albumId}/switch-artist`, data)
+}

@@ -65,16 +65,24 @@ class LoginStateManager(private val context: Context) {
             // 检查token是否即将过期（剩余1天时刷新）
             val userId = TokenStore.getUserId(context)
             if (userId != null) {
-                val response = repository.getCurrentUser()
-                if (response != null && response.token != null) {
-                    // 更新token和用户信息
-                    TokenStore.saveToken(context, response.token)
-                    response.userInfo?.let { user ->
-                        TokenStore.saveUserInfo(context, user.id, user.username, user.nickname)
+                val result = repository.getCurrentUserResult()
+                when {
+                    // 后端明确表示未授权：清理本地登录态
+                    result != null && (result.code == 401 || result.code == 403) -> {
+                        TokenStore.clearToken(context)
                     }
-                } else {
-                    // token已失效，清除本地存储
-                    TokenStore.clearToken(context)
+                    // 成功：同步用户信息 & 如有新 token 则续期（会刷新 15 天时间戳）
+                    result != null && result.code == 200 && result.data != null -> {
+                        val data = result.data
+                        data.userInfo?.let { user ->
+                            TokenStore.saveUserInfo(context, user.id, user.username, user.nickname)
+                        }
+                        if (!data.token.isNullOrBlank()) {
+                            TokenStore.saveToken(context, data.token)
+                        }
+                    }
+                    // 其他情况（网络异常=null / 服务端异常 / 数据为空）：保留本地 token，不强制登出
+                    else -> Unit
                 }
             }
         }
@@ -87,19 +95,21 @@ class LoginStateManager(private val context: Context) {
         val token = TokenStore.getToken(context)
         if (token != null) {
             try {
-                val response = repository.getCurrentUser()
-                if (response != null && response.userInfo != null) {
-                    // 更新用户信息
-                    response.userInfo.let { user ->
-                        TokenStore.saveUserInfo(context, user.id, user.username, user.nickname)
+                val result = repository.getCurrentUserResult()
+                when {
+                    result != null && (result.code == 401 || result.code == 403) -> {
+                        TokenStore.clearToken(context)
                     }
-                    // 如果服务器返回了新token，也更新token
-                    if (response.token != null) {
-                        TokenStore.saveToken(context, response.token)
+                    result != null && result.code == 200 && result.data?.userInfo != null -> {
+                        val data = result.data
+                        data.userInfo.let { user ->
+                            TokenStore.saveUserInfo(context, user.id, user.username, user.nickname)
+                        }
+                        if (!data.token.isNullOrBlank()) {
+                            TokenStore.saveToken(context, data.token)
+                        }
                     }
-                } else {
-                    // 用户信息获取失败，清除登录状态
-                    TokenStore.clearToken(context)
+                    else -> Unit // 网络/服务端异常：保留现有登录态
                 }
             } catch (e: Exception) {
                 // 网络异常，保留现有状态
