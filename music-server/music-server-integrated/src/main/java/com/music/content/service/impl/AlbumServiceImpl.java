@@ -12,9 +12,11 @@ import com.music.content.entity.Album;
 import com.music.content.entity.AlbumSong;
 import com.music.content.entity.Artist;
 import com.music.content.entity.Song;
+import com.music.content.entity.SongArtist;
 import com.music.content.mapper.AlbumMapper;
 import com.music.content.mapper.AlbumSongMapper;
 import com.music.content.mapper.ArtistMapper;
+import com.music.content.mapper.SongArtistMapper;
 import com.music.content.mapper.SongMapper;
 import com.music.content.service.AlbumService;
 import com.music.file.config.StorageConfig;
@@ -36,6 +38,7 @@ public class AlbumServiceImpl extends ServiceImpl<AlbumMapper, Album> implements
     private final ArtistMapper artistMapper;
     private final SongMapper songMapper;
     private final AlbumSongMapper albumSongMapper;
+    private final SongArtistMapper songArtistMapper;
     private final StorageConfig storageConfig;
     
     @Override
@@ -290,8 +293,44 @@ public class AlbumServiceImpl extends ServiceImpl<AlbumMapper, Album> implements
             String fp = song.getFilePath().replace("\\", "/");
             if (fp.startsWith(oldFolder + "/")) {
                 song.setFilePath(newFolder + fp.substring(oldFolder.length()));
-                songMapper.updateById(song);
             }
+
+            // 同步歌曲所属歌手，确保 App 端展示为新歌手
+            song.setArtistId(dto.getTargetArtistId());
+
+            // 同步 content_song_artist：只替换主歌手(sortOrder=0)，保留合唱等其它关联
+            try {
+                songArtistMapper.delete(new LambdaQueryWrapper<SongArtist>()
+                        .eq(SongArtist::getSongId, sid)
+                        .eq(SongArtist::getSortOrder, 0));
+                SongArtist main = new SongArtist();
+                main.setSongId(sid);
+                main.setArtistId(dto.getTargetArtistId());
+                main.setSortOrder(0);
+                songArtistMapper.insert(main);
+
+                // 维护 artistNames：新主歌手 + 现有其它关联歌手
+                java.util.List<SongArtist> others = songArtistMapper.selectList(
+                        new LambdaQueryWrapper<SongArtist>()
+                                .eq(SongArtist::getSongId, sid)
+                                .ne(SongArtist::getSortOrder, 0)
+                                .orderByAsc(SongArtist::getSortOrder)
+                );
+                java.util.List<String> names = new java.util.ArrayList<>();
+                names.add(targetArtist.getName());
+                for (SongArtist sa : others) {
+                    if (sa.getArtistId() == null) continue;
+                    Artist a = artistMapper.selectById(sa.getArtistId());
+                    if (a != null && StringUtils.hasText(a.getName())) {
+                        names.add(a.getName());
+                    }
+                }
+                song.setArtistNames(String.join(" / ", names));
+            } catch (Exception e) {
+                // 关联表同步失败不影响主流程：至少保证 song.artist_id 已更新
+            }
+
+            songMapper.updateById(song);
         }
 
         return SwitchAlbumArtistResultVO.ok(albumId, oldFolder, newFolder);

@@ -551,7 +551,9 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        // 清除播放器层缓存（若有）以及 Room 中记录的已缓存歌曲
                         viewModel.clearCache()
+                        viewModel.clearAllCachedSongs()
                         currentCacheSize = viewModel.getCacheSize()
                         showClearMusicCacheDialog = false
                     },

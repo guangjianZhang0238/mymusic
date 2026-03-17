@@ -23,6 +23,9 @@ import com.music.app.data.remote.UserSettingDto
 import com.music.app.data.remote.UserSettings
 import com.music.app.data.remote.EqualizerSettings
 import com.music.app.data.remote.UserSettingsStore
+import com.music.app.data.local.CachedSongEntity
+import com.music.app.data.local.SongCacheManager
+import android.net.Uri
 import com.music.app.data.repository.MusicRepository
 import com.music.app.player.PlayMode
 import com.music.app.ui.equalizer.EqualizerPreset
@@ -108,7 +111,9 @@ data class MusicUiState(
     val playbackPlaylist: List<SongDto> = emptyList(),
     val playbackPlaylistIndex: Int = -1,
     val isPlaybackPlaylistActive: Boolean = false,
-    val equalizerSettings: EqualizerSettings = EqualizerSettings()
+    val equalizerSettings: EqualizerSettings = EqualizerSettings(),
+    // 已缓存歌曲，用于“已缓存歌曲”页面与离线播放
+    val cachedSongs: List<CachedSongEntity> = emptyList()
 )
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
@@ -125,6 +130,54 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         // 轻量初始化：避免首开触发大量网络请求导致卡顿
         initializeAppLightweight()
         observePlayer()
+    }
+
+    /**
+     * 构造歌曲音频的完整 URL，供缓存使用
+     */
+    private fun buildSongAudioUrl(song: SongDto): String {
+        val path = song.filePath ?: return ""
+        return if (path.startsWith("http")) {
+            path
+        } else {
+            val normalizedPath = path.replace("\\", "/").trimStart('/')
+            val encodedPath = normalizedPath
+                .split("/")
+                .joinToString("/") { segment -> Uri.encode(segment) }
+            "${NetworkModule.staticBaseUrl}$encodedPath"
+        }
+    }
+
+    /**
+     * 当歌曲开始播放时，尝试在后台缓存整首歌和歌词，并维护最多 50 首的缓存上限
+     */
+    private suspend fun cacheSongIfNeeded(song: SongDto) {
+        withContext(Dispatchers.IO) {
+            try {
+                val app = getApplication<Application>()
+                val url = buildSongAudioUrl(song)
+                if (url.isBlank()) return@withContext
+                val lyricsMeta = repository.fetchLyricsMeta(song.id)
+                SongCacheManager.ensureSongCached(
+                    context = app,
+                    song = song,
+                    lyricsContent = lyricsMeta?.content,
+                    audioUrl = url
+                )
+                // 刷新已缓存歌曲列表
+                loadCachedSongsInternal()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun loadCachedSongsInternal() {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            SongCacheManager.getAllCachedSongs(app).collect { list ->
+                _uiState.value = _uiState.value.copy(cachedSongs = list)
+            }
+        }
     }
 
     private fun initializeAppLightweight() {
@@ -302,6 +355,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     repository.addPlayHistory(song)
                 }
                 launch { loadLyricsForSong(song) }
+                // 后台缓存整首歌曲与歌词
+                launch { cacheSongIfNeeded(song) }
             }
             
             // 将歌曲添加到播放列表（如果列表为空则创建新列表，否则添加到列表）
@@ -345,7 +400,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val song = songs.getOrNull(startIndex)
             if (song != null) {
                 loadLyricsForSong(song)
-                viewModelScope.launch { repository.addPlayHistory(song) }
+                viewModelScope.launch { 
+                    repository.addPlayHistory(song)
+                    cacheSongIfNeeded(song)
+                }
             }
         }
     }
@@ -366,6 +424,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     lyricsOffset = lyricsData.second,
                     currentLyricsId = lyricsMeta?.id
                 )
+                // 歌词成功加载后，尝试更新本地缓存中的歌词内容
+                viewModelScope.launch(Dispatchers.IO) {
+                    runCatching {
+                        val app = getApplication<Application>()
+                        SongCacheManager.ensureSongCached(
+                            context = app,
+                            song = song,
+                            lyricsContent = lyricsMeta?.content,
+                            audioUrl = buildSongAudioUrl(song)
+                        )
+                    }
+                }
             } catch (e: Exception) {
                 android.util.Log.e("MusicViewModel", "歌词加载失败: ${e.message}", e)
                 // 加载失败时清空歌词显示
@@ -1203,6 +1273,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             loadUserPlaylists()
             loadUserLyricsShares()
             loadFollowedArtists()
+            loadCachedSongs()
         }
     }
 
@@ -1345,6 +1416,83 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearCache() {
         playerController.clearCache()
+    }
+
+    /**
+     * 对外暴露的加载已缓存歌曲列表的方法，供“已缓存歌曲”页面调用
+     */
+    fun loadCachedSongs() {
+        loadCachedSongsInternal()
+    }
+
+    /**
+     * 播放已缓存的本地歌曲（无网也可）
+     */
+    fun playCachedSong(cachedSong: com.music.app.data.local.CachedSongEntity) {
+        viewModelScope.launch {
+            startPlaybackService()
+            val file = java.io.File(cachedSong.audioPath)
+            if (!file.exists()) {
+                // 本地文件丢失，提示并清理该记录
+                android.widget.Toast.makeText(
+                    getApplication(),
+                    "本地缓存文件已丢失，请联网后重新播放以重新缓存",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                clearLostCachedSong(cachedSong.songId)
+                return@launch
+            }
+            val songDto = SongDto(
+                id = cachedSong.songId,
+                title = cachedSong.songTitle,
+                artistName = cachedSong.artistName,
+                artistNames = cachedSong.artistName,
+                filePath = cachedSong.audioPath,
+                albumName = cachedSong.albumName,
+                albumCover = cachedSong.coverUrl
+            )
+            playerController.playLocalFile(file, songDto)
+
+            // 使用本地缓存的歌词内容（若存在）
+            val lyrics = SongCacheManager.parseLyrics(cachedSong.lyricsContent)
+            _uiState.value = _uiState.value.copy(
+                currentSong = songDto,
+                lyrics = lyrics,
+                currentLyricIndex = 0,
+                lyricsOffset = 0f,
+                currentLyricsId = null
+            )
+        }
+    }
+
+    /**
+     * 删除单首缓存歌曲
+     */
+    fun deleteCachedSong(songId: Long) {
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            SongCacheManager.deleteSongCache(app, songId)
+            loadCachedSongsInternal()
+        }
+    }
+
+    /**
+     * 清空所有缓存歌曲（供“已缓存歌曲”页面和设置页调用）
+     */
+    fun clearAllCachedSongs() {
+        val app = getApplication<Application>()
+        viewModelScope.launch(Dispatchers.IO) {
+            SongCacheManager.clearAllCachedSongs(app)
+            loadCachedSongsInternal()
+        }
+    }
+
+    private suspend fun clearLostCachedSong(songId: Long) {
+        val app = getApplication<Application>()
+        withContext(Dispatchers.IO) {
+            SongCacheManager.deleteSongCache(app, songId)
+            loadCachedSongsInternal()
+        }
     }
 
     fun checkLoginRequired(showWarning: Boolean = false): Boolean {

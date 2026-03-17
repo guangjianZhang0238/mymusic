@@ -430,4 +430,23 @@ class PlayerController(private val context: Context) {
     fun clearCache() {
         CacheManager.clearCache(context)
     }
+
+    /**
+     * 直接播放本地音频文件，配合已缓存歌曲离线播放使用
+     */
+    fun playLocalFile(audioFile: File, song: SongDto) {
+        try {
+            val uri = Uri.fromFile(audioFile)
+            val mediaItem = MediaItem.Builder()
+                .setUri(uri)
+                .build()
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            player.playWhenReady = true
+            _playlist.value = listOf(song)
+            _currentSong.value = song
+        } catch (e: Exception) {
+            android.util.Log.e("PlayerController", "播放本地文件失败: ${e.message}", e)
+        }
+    }
 }

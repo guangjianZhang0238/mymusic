@@ -89,6 +89,7 @@ import com.music.app.ui.screen.RegisterScreen
 import com.music.app.ui.screen.SearchScreen
 import com.music.app.ui.screen.SettingsScreen
 import com.music.app.ui.screen.SongFeedbackDialog
+import com.music.app.ui.screen.CachedSongsScreen
 
 @Composable
 fun MusicApp(viewModel: MusicViewModel = viewModel()) {
@@ -226,7 +227,8 @@ fun MusicApp(viewModel: MusicViewModel = viewModel()) {
                     onRegisterClick = { navController.navigate("register") },
                     onPlaylistClick = { navController.navigate("playlists") },
                     onSettingsClick = { navController.navigate("settings") },
-                    onRecentPlayedClick = { navController.navigate("recentPlayed") }
+                    onRecentPlayedClick = { navController.navigate("recentPlayed") },
+                    onCachedSongsClick = { navController.navigate("cachedSongs") }
                 )
             }
             composable("login") {
@@ -328,6 +330,12 @@ fun MusicApp(viewModel: MusicViewModel = viewModel()) {
             composable("playbackPlaylist") {
                 PlaybackPlaylistScreen(
                     viewModel = viewModel, 
+                    onBackClick = { navController.popBackStack() }
+                )
+            }
+            composable("cachedSongs") {
+                CachedSongsScreen(
+                    viewModel = viewModel,
                     onBackClick = { navController.popBackStack() }
                 )
             }

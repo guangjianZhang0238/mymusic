@@ -93,19 +93,19 @@ fun PlayerScreen(viewModel: MusicViewModel) {
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(280.dp)
+                .height(240.dp)
         )
 
         Text(
             text = uiState.currentSong?.title ?: "暂无歌曲",
             color = Color.White,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 14.dp)
+            modifier = Modifier.padding(top = 10.dp)
         )
         Text(
             text = uiState.currentSong?.artistNames ?: uiState.currentSong?.artistName ?: "",
             color = Color(0xFFBDBDBD),
-            modifier = Modifier.padding(top = 4.dp, bottom = 18.dp)
+            modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
         )
 
         Slider(

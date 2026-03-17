@@ -425,17 +425,39 @@ const loadFeedbacks = async () => {
 
 const openHandleDialog = (feedback: Feedback) => {
   currentFeedback.value = feedback
-  // 无歌词类型反馈进入歌词处理对话框
-  if (feedback.type === 'NO_LYRICS') {
+  // 无歌词 / 歌词错误 类型反馈进入歌词处理对话框
+  if (feedback.type === 'NO_LYRICS' || feedback.type === 'LYRICS_ERROR') {
     lyricsContent.value = ''
     autoMatchResult.value = ''
     noLyricsDialogVisible.value = true
+    // 歌词错误场景下，优先展示当前已存在的歌词，方便在此基础上修改
+    if (feedback.type === 'LYRICS_ERROR') {
+      loadCurrentLyricsForFeedback()
+    }
   } else {
     handleForm.value = {
       status: feedback.status === 'PENDING' ? 'RESOLVED' : feedback.status,
       handleNote: feedback.handleNote || ''
     }
     handleDialogVisible.value = true
+  }
+}
+
+// 加载当前歌曲已有歌词，用于“歌词错误”场景下展示和编辑
+const loadCurrentLyricsForFeedback = async () => {
+  if (!currentFeedback.value?.songId) return
+  try {
+    const res = await request.get(`/lyrics/song/${currentFeedback.value.songId}`)
+    if (res && (res as any).content) {
+      const normalizedContent = String((res as any).content)
+        .replace(/\\r\\n/g, '\n')
+        .replace(/\\n/g, '\n')
+      lyricsContent.value = normalizedContent
+    } else {
+      lyricsContent.value = ''
+    }
+  } catch (error: any) {
+    ElMessage.error('获取当前歌词失败: ' + (error.message || '未知错误'))
   }
 }
 

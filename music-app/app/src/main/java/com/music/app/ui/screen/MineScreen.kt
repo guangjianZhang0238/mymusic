@@ -51,7 +51,8 @@ fun MineScreen(
     onRegisterClick: () -> Unit = {},
     onPlaylistClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onRecentPlayedClick: () -> Unit = {}
+    onRecentPlayedClick: () -> Unit = {},
+    onCachedSongsClick: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -100,6 +101,17 @@ fun MineScreen(
                     onClick = onRecentPlayedClick
                 )
             }
+        }
+
+        // 已缓存歌曲入口
+        item {
+            SectionCard(
+                title = "已缓存歌曲",
+                icon = Icons.Default.MusicNote,
+                count = uiState.cachedSongs.size,
+                subtitle = if (uiState.cachedSongs.isNotEmpty()) "${uiState.cachedSongs.size} 首 · 支持离线播放" else "暂无缓存歌曲",
+                onClick = onCachedSongsClick
+            )
         }
 
         // 收藏歌曲
