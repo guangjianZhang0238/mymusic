@@ -275,7 +275,7 @@ private fun BufferedProgressSlider(
             // 如果缓冲只比已播放多一点点，给一个“最小可见宽度”，避免肉眼看不出来
             val minExtraPx = 8.dp.toPx()
             if (bufferedEnd > playedEnd && bufferedEnd - playedEnd < minExtraPx) {
-                bufferedEnd = min(end, playedEnd + minExtraPx)
+                bufferedEnd = (playedEnd + minExtraPx).coerceAtMost(end)
             }
             if (bufferedEnd > 0f) {
                 // 用“双层描边”模拟阴影/缓存光晕，避免依赖 nativeCanvas（不同 Compose 版本兼容性更好）
