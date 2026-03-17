@@ -39,7 +39,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -268,23 +267,19 @@ private fun BufferedProgressSlider(
             // buffered track with subtle shadow glow
             val bufferedEnd = end * max(bufferedFraction, progressFraction)
             if (bufferedEnd > 0f) {
-                drawIntoCanvas { canvas ->
-                    val paint = androidx.compose.ui.graphics.Paint()
-                    val frameworkPaint = paint.asFrameworkPaint().apply {
-                        isAntiAlias = true
-                        color = bufferedColor.toArgb()
-                        strokeWidth = stroke
-                        strokeCap = android.graphics.Paint.Cap.ROUND
-                        setShadowLayer(stroke * 1.6f, 0f, 0f, Color.Black.copy(alpha = 0.35f).toArgb())
-                    }
-                    canvas.nativeCanvas.drawLine(
-                        start,
-                        centerY,
-                        bufferedEnd,
-                        centerY,
-                        frameworkPaint
-                    )
-                }
+                // 用“双层描边”模拟阴影/缓存光晕，避免依赖 nativeCanvas（不同 Compose 版本兼容性更好）
+                drawLine(
+                    color = Color.Black.copy(alpha = 0.25f),
+                    start = androidx.compose.ui.geometry.Offset(start, centerY),
+                    end = androidx.compose.ui.geometry.Offset(bufferedEnd, centerY),
+                    strokeWidth = stroke * 2.2f
+                )
+                drawLine(
+                    color = bufferedColor,
+                    start = androidx.compose.ui.geometry.Offset(start, centerY),
+                    end = androidx.compose.ui.geometry.Offset(bufferedEnd, centerY),
+                    strokeWidth = stroke
+                )
             }
 
             // played track
