@@ -96,6 +96,9 @@ class PlayerController(private val context: Context) {
     private val _currentPositionMs = MutableStateFlow(0L)
     val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
 
+    private val _bufferedPositionMs = MutableStateFlow(0L)
+    val bufferedPositionMs: StateFlow<Long> = _bufferedPositionMs.asStateFlow()
+
     private val _durationMs = MutableStateFlow(0L)
     val durationMs: StateFlow<Long> = _durationMs.asStateFlow()
 
@@ -341,11 +344,16 @@ class PlayerController(private val context: Context) {
     fun syncProgress() {
         try {
             val currentPosition = player.currentPosition.coerceAtLeast(0L)
+            val bufferedPosition = player.bufferedPosition.coerceAtLeast(0L)
             val duration = player.duration.coerceAtLeast(0L)
             
             // 只有当值发生变化时才更新，避免不必要的状态更新
             if (_currentPositionMs.value != currentPosition) {
                 _currentPositionMs.value = currentPosition
+            }
+
+            if (_bufferedPositionMs.value != bufferedPosition) {
+                _bufferedPositionMs.value = bufferedPosition
             }
             
             // 更严格的时长更新条件

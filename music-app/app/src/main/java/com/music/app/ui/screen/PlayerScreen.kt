@@ -2,7 +2,9 @@ package com.music.app.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -37,8 +39,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +51,7 @@ import com.music.app.data.remote.NetworkModule
 import com.music.app.player.PlayMode
 import com.music.app.ui.MusicViewModel
 import kotlinx.coroutines.launch
+import kotlin.math.max
 
 @Composable
 fun PlayerScreen(viewModel: MusicViewModel) {
@@ -79,6 +84,7 @@ fun PlayerScreen(viewModel: MusicViewModel) {
     }
 
     val progress = uiState.progressMs.toFloat().coerceAtLeast(0f)
+    val buffered = uiState.bufferedPositionMs.toFloat().coerceAtLeast(0f)
     val duration = uiState.durationMs.toFloat().coerceAtLeast(1f)
 
     Column(
@@ -108,10 +114,11 @@ fun PlayerScreen(viewModel: MusicViewModel) {
             modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
         )
 
-        Slider(
-            value = progress,
-            onValueChange = { viewModel.seekTo(it.toLong()) },
-            valueRange = 0f..duration
+        BufferedProgressSlider(
+            progress = progress,
+            buffered = buffered,
+            duration = duration,
+            onSeekTo = { viewModel.seekTo(it.toLong()) }
         )
 
         Row(
@@ -219,6 +226,88 @@ fun PlayerScreen(viewModel: MusicViewModel) {
                 // 重置反馈状态
                 viewModel.resetFeedbackState()
             }
+        )
+    }
+}
+
+@Composable
+private fun BufferedProgressSlider(
+    progress: Float,
+    buffered: Float,
+    duration: Float,
+    onSeekTo: (Float) -> Unit,
+    trackHeight: Dp = 4.dp
+) {
+    val safeDuration = max(duration, 1f)
+    val progressFraction = (progress / safeDuration).coerceIn(0f, 1f)
+    val bufferedFraction = (buffered / safeDuration).coerceIn(0f, 1f)
+
+    val playedColor = MaterialTheme.colorScheme.primary
+    val bufferedColor = Color.White.copy(alpha = 0.35f)
+    val baseColor = Color.White.copy(alpha = 0.15f)
+
+    Box(modifier = Modifier.fillMaxWidth()) {
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+        ) {
+            val centerY = size.height / 2f
+            val stroke = trackHeight.toPx().coerceAtLeast(1f)
+            val start = 0f
+            val end = size.width
+
+            // base track
+            drawLine(
+                color = baseColor,
+                start = androidx.compose.ui.geometry.Offset(start, centerY),
+                end = androidx.compose.ui.geometry.Offset(end, centerY),
+                strokeWidth = stroke
+            )
+
+            // buffered track with subtle shadow glow
+            val bufferedEnd = end * max(bufferedFraction, progressFraction)
+            if (bufferedEnd > 0f) {
+                drawIntoCanvas { canvas ->
+                    val paint = androidx.compose.ui.graphics.Paint()
+                    val frameworkPaint = paint.asFrameworkPaint().apply {
+                        isAntiAlias = true
+                        color = bufferedColor.toArgb()
+                        strokeWidth = stroke
+                        strokeCap = android.graphics.Paint.Cap.ROUND
+                        setShadowLayer(stroke * 1.6f, 0f, 0f, Color.Black.copy(alpha = 0.35f).toArgb())
+                    }
+                    canvas.nativeCanvas.drawLine(
+                        start,
+                        centerY,
+                        bufferedEnd,
+                        centerY,
+                        frameworkPaint
+                    )
+                }
+            }
+
+            // played track
+            val playedEnd = end * progressFraction
+            if (playedEnd > 0f) {
+                drawLine(
+                    color = playedColor,
+                    start = androidx.compose.ui.geometry.Offset(start, centerY),
+                    end = androidx.compose.ui.geometry.Offset(playedEnd, centerY),
+                    strokeWidth = stroke
+                )
+            }
+        }
+
+        // Transparent tracks; keep thumb + gestures from Slider
+        Slider(
+            value = progress.coerceIn(0f, safeDuration),
+            onValueChange = { onSeekTo(it.coerceIn(0f, safeDuration)) },
+            valueRange = 0f..safeDuration,
+            colors = SliderDefaults.colors(
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent
+            )
         )
     }
 }
