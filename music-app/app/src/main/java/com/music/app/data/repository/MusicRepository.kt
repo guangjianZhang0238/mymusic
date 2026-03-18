@@ -291,7 +291,7 @@ class MusicRepository {
         password: String
     ): Boolean = try {
         Log.d("MusicRepository", "开始注册，用户名: $username")
-        Log.d("MusicRepository", "发送请求到: ${NetworkModule.BASE_URL}api/app/auth/register")
+        Log.d("MusicRepository", "发送请求到: ${NetworkModule.currentBaseUrl}api/app/auth/register")
         val request = RegisterRequest(username, password, null, null, null)
         Log.d("MusicRepository", "请求体: $request")
         val response = api.register(request)

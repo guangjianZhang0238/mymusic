@@ -37,6 +37,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +56,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.music.app.data.remote.ServerEndpointStore
 import com.music.app.data.remote.TokenStore
 import com.music.app.ui.MusicViewModel
 
@@ -72,6 +74,8 @@ fun SettingsScreen(
 
     var showThemeColorPicker by remember { mutableStateOf(false) }
     var showEqualizerDialog by remember { mutableStateOf(false) }
+    var showServerPickerDialog by remember { mutableStateOf(false) }
+    var selectedServer by remember { mutableStateOf(ServerEndpointStore.getSelected(context)) }
 
     // 计算缓存大小
     currentCacheSize = viewModel.getCacheSize()
@@ -243,6 +247,53 @@ fun SettingsScreen(
                         )
                     ) {
                         Text("打开")
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // 服务器切换（隐藏真实地址）
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E))
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Wallpaper,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 12.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "服务器",
+                            color = Color.White,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            "切换服务器线路（服务器1/服务器2）",
+                            color = Color(0xFFBDBDBD),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    Button(
+                        onClick = { showServerPickerDialog = true },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
+                        Text(selectedServer.displayName)
                     }
                 }
             }
@@ -609,6 +660,50 @@ fun SettingsScreen(
                 showThemeColorPicker = false
             },
             onDismiss = { showThemeColorPicker = false }
+        )
+    }
+
+    if (showServerPickerDialog) {
+        val options = listOf(
+            ServerEndpointStore.ServerEndpoint.SERVER_1,
+            ServerEndpointStore.ServerEndpoint.SERVER_2
+        )
+        AlertDialog(
+            onDismissRequest = { showServerPickerDialog = false },
+            title = { Text("选择服务器", color = Color.White) },
+            text = {
+                Column {
+                    options.forEach { option ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    ServerEndpointStore.setSelected(context, option)
+                                    selectedServer = option
+                                    showServerPickerDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = (option == selectedServer),
+                                onClick = {
+                                    ServerEndpointStore.setSelected(context, option)
+                                    selectedServer = option
+                                    showServerPickerDialog = false
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(option.displayName, color = Color.White)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showServerPickerDialog = false }) {
+                    Text("关闭", color = Color(0xFFBDBDBD))
+                }
+            }
         )
     }
 }
