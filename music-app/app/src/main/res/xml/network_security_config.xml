@@ -3,6 +3,7 @@
     <!-- 允许特定域名的HTTP明文通信 -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">120.79.224.90</domain>
+        <domain includeSubdomains="true">103.215.83.202</domain>
     </domain-config>
     
     <!-- 开发阶段允许所有HTTP通信（生产环境建议移除） -->
