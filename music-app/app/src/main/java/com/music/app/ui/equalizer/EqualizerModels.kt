@@ -23,12 +23,12 @@ enum class EqualizerPreset(val code: String, val displayName: String, val gains:
     }
 }
 
-fun EqualizerPreset.toSettings(masterGainDb: Float = 0f): EqualizerSettings {
+fun EqualizerPreset.toSettings(): EqualizerSettings {
     val isOff = this == EqualizerPreset.OFF
     return EqualizerSettings(
         enabled = !isOff,
         preset = code,
-        masterGainDb = masterGainDb,
+        masterGainDb = 0f,
         bandGainsDb = gains
     )
 }

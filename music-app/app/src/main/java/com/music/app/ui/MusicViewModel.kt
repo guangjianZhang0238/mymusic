@@ -835,10 +835,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setEqualizerPreset(preset: EqualizerPreset) {
         val currentSettings = _userSettings.value
+        val currentEq = currentSettings.equalizer ?: EqualizerSettings()
+        val keepMasterGain = currentEq.masterGainDb
         val newEqSettings = when (preset.code) {
-            "OFF" -> EqualizerSettings(enabled = false)
-            "CUSTOM" -> currentSettings.equalizer ?: EqualizerSettings()
-            else -> EqualizerSettings(enabled = true, preset = preset.code, bandGainsDb = preset.gains)
+            "OFF" -> currentEq.copy(enabled = false, preset = "OFF")
+            "CUSTOM" -> currentEq.copy(enabled = true, preset = "CUSTOM", masterGainDb = keepMasterGain)
+            else -> currentEq.copy(
+                enabled = true,
+                preset = preset.code,
+                masterGainDb = keepMasterGain,
+                bandGainsDb = preset.gains
+            )
         }
         updateUserSettings(currentSettings.copy(equalizer = newEqSettings), immediate = true)
     }

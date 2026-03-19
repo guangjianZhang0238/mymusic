@@ -101,7 +101,7 @@ fun EqualizerDialog(
                             )
                         )
                     )
-                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 28.dp)
             ) {
                 // 使用 Column 进行垂直布局，每个模块独占一行
                 Column(
@@ -270,7 +270,7 @@ fun EqualizerDialog(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
                         border = BorderStroke(1.dp, themeColor.copy(alpha = 0.2f))
                     ) {
-                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -285,7 +285,7 @@ fun EqualizerDialog(
                                 if (eq.stereoBalance != 0f) {
                                     androidx.compose.material3.TextButton(
                                         onClick = { viewModel.updateStereoBalance(0f) },
-                                        modifier = Modifier.height(28.dp)
+                                        modifier = Modifier.height(24.dp)
                                     ) {
                                         Text(
                                             "居中",
@@ -333,7 +333,7 @@ fun EqualizerDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth(0.5f)
-                                        .height(30.dp)
+                                        .height(22.dp)
                                         .align(Alignment.CenterStart)
                                         .background(
                                             Color(0xFF1E90FF).copy(alpha = 0.3f),
@@ -345,7 +345,7 @@ fun EqualizerDialog(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth(0.5f)
-                                        .height(30.dp)
+                                        .height(22.dp)
                                         .align(Alignment.CenterEnd)
                                         .background(
                                             Color(0xFFFF4757).copy(alpha = 0.3f),
