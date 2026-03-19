@@ -337,12 +337,16 @@ const canEditNoLyrics = computed(() => currentFeedback.value?.status === 'PENDIN
 
 // 是否标记已处理确认对话框
 const markResolvedDialogVisible = ref(false)
+// 保存歌词后待确认的反馈ID（避免对话框关闭清空状态导致无法更新）
+const pendingResolveFeedbackId = ref<number | null>(null)
 
 // 重置无歌词对话框状态
 const resetNoLyricsDialog = () => {
   lyricsContent.value = ''
   autoMatchResult.value = ''
-  currentFeedback.value = null
+  // 注意：不要在这里清空 currentFeedback。
+  // “已匹配歌词，完成”会先关闭本对话框再弹出“是否标记已解决”，
+  // 若清空会导致无法拿到反馈ID去更新状态。
 }
 
 const getTypeName = (type: string) => {
@@ -398,7 +402,7 @@ const loadFeedbacks = async () => {
   loading.value = true
   try {
     const params: any = {
-      current: currentPage.value,
+      page: currentPage.value,
       size: pageSize.value
     }
     if (filterStatus.value) params.status = filterStatus.value
@@ -514,6 +518,7 @@ const saveLyricsAndFinish = async () => {
       { content: lyricsContent.value }
     )
     ElMessage.success('歌词已保存')
+    pendingResolveFeedbackId.value = currentFeedback.value.id
     noLyricsDialogVisible.value = false
     markResolvedDialogVisible.value = true
   } catch (error: any) {
@@ -526,10 +531,12 @@ const saveLyricsAndFinish = async () => {
 // 确认是否标记已处理
 const confirmMarkResolved = async (mark: boolean) => {
   markResolvedDialogVisible.value = false
-  if (mark && currentFeedback.value) {
+  const id = pendingResolveFeedbackId.value ?? currentFeedback.value?.id ?? null
+  pendingResolveFeedbackId.value = null
+  if (mark && id != null) {
     try {
       await request.put(
-        `/app/music/feedback/admin/handle/${currentFeedback.value.id}`,
+        `/app/music/feedback/admin/handle/${id}`,
         { status: 'RESOLVED', handleNote: '已匹配歌词' }
       )
       ElMessage.success('已标记为已解决')
@@ -538,6 +545,8 @@ const confirmMarkResolved = async (mark: boolean) => {
       ElMessage.error('标记失败，请手动处理')
     }
   }
+  // 结束整个流程后再清理当前反馈，避免影响确认框逻辑
+  currentFeedback.value = null
 }
 
 onMounted(() => {
