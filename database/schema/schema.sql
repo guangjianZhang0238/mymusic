@@ -21,13 +21,17 @@ CREATE TABLE IF NOT EXISTS sys_user (
     nickname VARCHAR(50) COMMENT '昵称',
     avatar VARCHAR(255) COMMENT '头像',
     phone VARCHAR(20) COMMENT '手机号',
+    union_id VARCHAR(64) COMMENT '微信unionId',
+    open_id VARCHAR(64) COMMENT '微信openId',
     email VARCHAR(100) COMMENT '邮箱',
     status INT DEFAULT 1 COMMENT '状态 1正常 0禁用',
     role INT DEFAULT 0 COMMENT '角色 0普通用户 1管理员',
     last_login_time DATETIME COMMENT '最后登录时间',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deleted INT DEFAULT 0 COMMENT '逻辑删除 0未删除 1已删除'
+    deleted INT DEFAULT 0 COMMENT '逻辑删除 0未删除 1已删除',
+    UNIQUE KEY uk_union_id (union_id),
+    UNIQUE KEY uk_open_id (open_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统用户表';
 
 -- 1.2 异步任务表

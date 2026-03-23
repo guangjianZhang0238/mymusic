@@ -1,0 +1,15 @@
+<view class="lyrics-page page-shell">
+  <view class="card glow-card">
+    <view class="title">{{songName}}</view>
+    <view class="artist text-muted">{{artistName}}</view>
+  </view>
+
+  <view class="card lyrics">
+    <block wx:if="{{lines.length}}">
+      <block wx:for="{{lines}}" wx:key="index">
+        <view class="line">{{item.text}}</view>
+      </block>
+    </block>
+    <view wx:else class="text-muted">暂无歌词</view>
+  </view>
+</view>

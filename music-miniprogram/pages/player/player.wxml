@@ -1,0 +1,47 @@
+<view class="player-page page-shell">
+  <view class="card now-playing glow-card">
+    <image class="cover" src="{{song.coverUrl || song.albumCover}}" mode="aspectFill" />
+    <view class="title">{{song.name || song.title}}</view>
+    <view class="artist text-muted">{{song.artistName || song.artistNames}}</view>
+  </view>
+
+  <view class="card progress">
+    <slider
+      value="{{progress}}"
+      max="{{duration || 1}}"
+      activeColor="#ff8fb8"
+      backgroundColor="#e2e8f0"
+      block-color="#7dd3fc"
+      bindchanging="onSeeking"
+      bindchange="onSeek"
+    />
+    <view class="time">
+      <text>{{currentTimeText}}</text>
+      <text>{{durationText}}</text>
+    </view>
+  </view>
+
+  <view class="card controls">
+    <view class="ctrl" bindtap="prevSong">⏮️</view>
+    <view class="ctrl play" bindtap="togglePlay">{{playing ? '⏸️' : '▶️'}}</view>
+    <view class="ctrl" bindtap="nextSong">⏭️</view>
+    <view class="ctrl" bindtap="toggleFavorite">{{favorited ? '❤️' : '🤍'}}</view>
+  </view>
+
+  <view class="card lyrics-panel">
+    <view class="lyrics-title">歌词</view>
+    <scroll-view class="lyrics-scroll" scroll-y="true" scroll-with-animation="true" scroll-into-view="{{lyricScrollIntoView}}">
+      <block wx:if="{{lyricsLines.length}}">
+        <view
+          wx:for="{{lyricsLines}}"
+          wx:key="id"
+          id="{{item.id}}"
+          class="lyric-line {{index === activeLyricIndex ? 'active' : ''}}"
+        >
+          {{item.text}}
+        </view>
+      </block>
+      <view wx:else class="lyric-empty">暂无歌词</view>
+    </scroll-view>
+  </view>
+</view>

@@ -1,0 +1,58 @@
+<view class="login-page page-shell">
+  <view class="hero card glow-card">
+    <view class="title">佩奇妙妙屋</view>
+    <view class="subtitle">登录以同步收藏和播放记录</view>
+  </view>
+
+  <view class="card auth-card">
+    <view class="mode-switch">
+      <view class="mode-item {{mode === 'login' ? 'active' : ''}}" data-mode="login" bindtap="switchMode">登录</view>
+      <view class="mode-item {{mode === 'register' ? 'active' : ''}}" data-mode="register" bindtap="switchMode">注册</view>
+    </view>
+
+    <view class="form-item">
+      <view class="label">用户名</view>
+      <input
+        class="input"
+        placeholder="请输入用户名"
+        value="{{form.username}}"
+        data-field="username"
+        bindinput="handleInput"
+      />
+    </view>
+
+    <view class="form-item">
+      <view class="label">密码</view>
+      <input
+        class="input"
+        type="password"
+        placeholder="请输入密码"
+        value="{{form.password}}"
+        data-field="password"
+        bindinput="handleInput"
+      />
+    </view>
+
+    <view wx:if="{{mode === 'register'}}" class="form-item">
+      <view class="label">确认密码</view>
+      <input
+        class="input"
+        type="password"
+        placeholder="请再次输入密码"
+        value="{{form.confirmPassword}}"
+        data-field="confirmPassword"
+        bindinput="handleInput"
+      />
+    </view>
+
+    <view wx:if="{{errorMessage}}" class="error-text">{{errorMessage}}</view>
+
+    <button class="btn-primary submit-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="handleSubmit">
+      {{mode === 'login' ? '登录' : '注册'}}
+    </button>
+
+    <view class="mode-tip" bindtap="switchMode" data-mode="{{mode === 'login' ? 'register' : 'login'}}">
+      {{mode === 'login' ? '还没有账号？去注册' : '已有账号？去登录'}}
+    </view>
+  </view>
+</view>

@@ -1,0 +1,39 @@
+<view class="home-page page-shell">
+  <view class="hero card glow-card">
+    <view class="greeting">Hi，{{nickname}}</view>
+    <view class="desc">今天也一起听点好歌吧</view>
+    <view class="tags">
+      <view class="tag">每日推荐</view>
+      <view class="tag">轻松氛围</view>
+      <view class="tag">专注学习</view>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">热门歌手榜</view>
+    <view class="song-list">
+      <block wx:for="{{topArtists}}" wx:key="id">
+        <view class="song-card" bindtap="openArtist" data-id="{{item.id}}" data-name="{{item.name}}">
+          <image class="cover" src="{{item.avatar || defaultSongCover}}" mode="aspectFill" />
+          <view class="info">
+            <view class="name">{{item.name}}</view>
+            <view class="artist text-muted">{{item.songCount || 0}} 首歌曲 · {{item.albumCount || 0}} 张专辑</view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="section">
+    <view class="section-title">热歌榜</view>
+    <view class="song-grid">
+      <block wx:for="{{hot}}" wx:key="id">
+        <view class="song-tile" bindtap="playSong" data-id="{{item.id}}">
+          <image class="tile-cover" src="{{item.albumCover || item.artistCover || item.coverUrl || defaultSongCover}}" mode="aspectFill" />
+          <view class="tile-name">{{item.title || item.name}}</view>
+          <view class="tile-artist text-muted">{{item.artistName || item.artistNames}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

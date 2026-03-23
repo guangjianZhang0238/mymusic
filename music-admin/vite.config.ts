@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => {
           },
           // 增加大文件上传支持
           timeout: 600000, // 10分钟
+          
           proxyTimeout: 600000, // 10分钟
           // 关键：禁用 body 解析，支持大文件流式传输
           configure: (proxy) => {

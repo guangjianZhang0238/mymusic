@@ -22,6 +22,12 @@ public class UserVO {
     
     @Schema(description = "手机号")
     private String phone;
+
+    @Schema(description = "微信unionId")
+    private String unionId;
+
+    @Schema(description = "微信openId")
+    private String openId;
     
     @Schema(description = "邮箱")
     private String email;

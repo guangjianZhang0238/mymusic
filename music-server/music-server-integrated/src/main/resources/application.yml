@@ -16,6 +16,11 @@ server:
     max-connections: 8192
 
 spring:
+  cache:
+    type: redis
+    redis:
+      time-to-live: 600000
+      cache-null-values: false
   application:
     name: music-server
   
@@ -30,7 +35,7 @@ spring:
       force-response: true
   
   datasource:
-    url: jdbc:mysql://localhost:3306/music_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true&connectionCharset=utf8mb4&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2
+    url: jdbc:mysql://127.0.0.1:3306/music_db?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=UTF-8&connectionCollation=utf8mb4_unicode_ci&allowPublicKeyRetrieval=true&useUnicode=true&connectionCharset=utf8mb4&autoReconnect=true&failOverReadOnly=false&maxReconnects=10&initialTimeout=2
     username: root
     password: 43ae1ff64991
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -51,7 +56,7 @@ spring:
       auto-commit: true
   
   redis:
-    host: localhost
+    host: 127.0.0.1
     port: 6379
     database: 0
     password: Guangjian38+++
@@ -87,19 +92,24 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # 关闭 MyBatis SQL 控制台输出
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
     map-underscore-to-camel-case: true
 
 music:
+  miniprogram:
+    appid: wx51470b9b69486d97
+    secret: 67d917c2084326841365dd6d520db990
   storage:
     # 数据根目录，可以是绝对路径或相对路径（相对于应用启动目录）
     # Windows 示例：D:/mymusic-data
     # Linux  示例：/data/mymusic
     # 相对路径示例（推荐开发环境使用）：data
     data-root-url: C:/project/exercises/mymusic/data_folder
-    # 在数据根目录下的业务存储根目录和临时目录（相对路径）
+    # 在数据根目录下的业务存储根目录、临时目录和用户文件目录（相对路径）
     base-path: music_source
     temp-path: music_temp
+    user-path: user_files
     # 单个文件最大上传大小（字节）。2GB
     max-file-size: 2147483648
   
@@ -119,10 +129,10 @@ music:
 logging:
   level:
     root: info
-    com.music: debug
-    com.zaxxer.hikari: debug
-    org.springframework.jdbc: debug
-    org.mybatis: debug
+    com.music: info
+    com.zaxxer.hikari: warn
+    org.springframework.jdbc: warn
+    org.mybatis: warn
   # 日志编码配置
   charset:
     console: UTF-8

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 @EnableConfigurationProperties({StorageConfig.class})
 @EnableAsync
 @EnableScheduling
+@org.springframework.cache.annotation.EnableCaching
 public class MusicServerApplication {
 
     public static void main(String[] args) {

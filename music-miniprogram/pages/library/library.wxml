@@ -1,0 +1,38 @@
+<view class="library-page page-shell">
+  <view class="card glow-card">
+    <view class="section-header">
+      <view class="section-title">你的歌单</view>
+      <button class="btn-outline" bindtap="openCreate">新建</button>
+    </view>
+    <view class="playlist-list">
+      <block wx:for="{{playlists}}" wx:key="id">
+        <view class="playlist-card">
+          <view class="playlist-main" bindtap="openPlaylist" data-id="{{item.id}}">
+            <image class="cover" src="{{item.coverUrl || item.coverImage || defaultCover}}" mode="aspectFill" />
+            <view class="info">
+              <view class="name">{{item.name}}</view>
+              <view class="count text-muted">{{item.songCount}} 首</view>
+            </view>
+          </view>
+          <view class="actions">
+            <button class="btn-text" bindtap="uploadCover" data-id="{{item.id}}">封面</button>
+            <button class="btn-text" bindtap="openEdit" data-id="{{item.id}}" data-name="{{item.name}}" data-desc="{{item.description}}">编辑</button>
+            <button class="btn-text danger" bindtap="deleteItem" data-id="{{item.id}}">删除</button>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view wx:if="{{showModal}}" class="modal-mask" bindtap="closeModal">
+    <view class="modal" catchtap="noop">
+      <view class="modal-title">{{modalTitle}}</view>
+      <input class="input" placeholder="歌单名称" value="{{form.name}}" bindinput="onNameInput" />
+      <textarea class="textarea" placeholder="歌单描述（可选）" value="{{form.description}}" bindinput="onDescInput"></textarea>
+      <view class="modal-actions">
+        <button class="btn-text" bindtap="closeModal">取消</button>
+        <button class="btn-primary" bindtap="submitForm">保存</button>
+      </view>
+    </view>
+  </view>
+</view>

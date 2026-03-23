@@ -62,7 +62,7 @@ public class LyricsShareServiceImpl extends ServiceImpl<LyricsShareMapper, Lyric
         LambdaQueryWrapper<LyricsShare> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(LyricsShare::getUserId, userId);
         wrapper.eq(LyricsShare::getDeleted, 0);
-        wrapper.orderByDesc(LyricsShare::getCreateTime);
+        wrapper.orderByDesc(LyricsShare::getShareTime);
 
         Page<LyricsShare> pageObj = new Page<>(page, size);
         Page<LyricsShare> result = page(pageObj, wrapper);
@@ -79,7 +79,7 @@ public class LyricsShareServiceImpl extends ServiceImpl<LyricsShareMapper, Lyric
         LambdaQueryWrapper<LyricsShare> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(LyricsShare::getLyricsId, lyricsId);
         wrapper.eq(LyricsShare::getDeleted, 0);
-        wrapper.orderByDesc(LyricsShare::getCreateTime);
+        wrapper.orderByDesc(LyricsShare::getShareTime);
 
         Page<LyricsShare> pageObj = new Page<>(page, size);
         Page<LyricsShare> result = page(pageObj, wrapper);
@@ -109,7 +109,7 @@ public class LyricsShareServiceImpl extends ServiceImpl<LyricsShareMapper, Lyric
         dto.setLyricsId(share.getLyricsId());
         dto.setUserId(share.getUserId());
         dto.setShareType(share.getShareType());
-        dto.setCreateTime(share.getCreateTime());
+        dto.setCreateTime(share.getShareTime());
 
         // 查询用户信息
         User user = userMapper.selectById(share.getUserId());

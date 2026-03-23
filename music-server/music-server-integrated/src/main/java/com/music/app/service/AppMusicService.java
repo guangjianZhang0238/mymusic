@@ -14,7 +14,7 @@ public interface AppMusicService {
 
     List<AppSongVO> hotSongs();
 
-    Page<AppAlbumVO> pageAlbums(Integer current, Integer size, String keyword);
+    Page<AppAlbumVO> pageAlbums(Integer current, Integer size, String keyword, Long artistId);
 
     Page<AppArtistVO> pageArtists(Integer current, Integer size, String keyword);
 

@@ -27,6 +27,7 @@ public class DatabaseInitializer implements ApplicationRunner {
             createSongTable();
             createSongArtistTable(); // 添加歌曲歌手关联表
             createAlbumSongTable(); // 添加专辑歌曲关联表，支持一首歌被多个专辑收录
+            fixHistoricalSongData(); // 一次性修正历史歌曲数据
             createLyricsTable();
             createPlaylistTable();
             createPlaylistSongTable();
@@ -64,6 +65,8 @@ public class DatabaseInitializer implements ApplicationRunner {
                 nickname VARCHAR(50) COMMENT '昵称',
                 avatar VARCHAR(255) COMMENT '头像',
                 phone VARCHAR(20) COMMENT '手机号',
+                union_id VARCHAR(64) COMMENT '微信unionId',
+                open_id VARCHAR(64) COMMENT '微信openId',
                 email VARCHAR(100) COMMENT '邮箱',
                 status INT DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
                 role INT DEFAULT 0 COMMENT '角色：0-普通用户，1-管理员',
@@ -74,6 +77,11 @@ public class DatabaseInitializer implements ApplicationRunner {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表'
             """;
         jdbcTemplate.execute(sql);
+
+        // 兼容历史库：补齐小程序登录需要的字段
+        addColumnIfNotExists("sys_user", "union_id", "VARCHAR(64) COMMENT '微信unionId'");
+        addColumnIfNotExists("sys_user", "open_id", "VARCHAR(64) COMMENT '微信openId'");
+
         log.info("用户表创建成功");
     }
     
@@ -271,6 +279,25 @@ public class DatabaseInitializer implements ApplicationRunner {
             """;
         jdbcTemplate.execute(sql);
         log.info("歌曲歌手关联表创建成功");
+    }
+
+    /**
+     * 一次性修正历史歌曲数据：
+     * 1) status 为空的歌曲置为 1（启用）
+     * 2) deleted 为空的歌曲置为 0（未删除）
+     */
+    private void fixHistoricalSongData() {
+        try {
+            Integer fixedStatus = jdbcTemplate.update(
+                    "UPDATE content_song SET status = 1 WHERE status IS NULL"
+            );
+            Integer fixedDeleted = jdbcTemplate.update(
+                    "UPDATE content_song SET deleted = 0 WHERE deleted IS NULL"
+            );
+            log.info("历史歌曲数据修正完成：status 修正 {} 条，deleted 修正 {} 条", fixedStatus, fixedDeleted);
+        } catch (Exception e) {
+            log.warn("历史歌曲数据修正失败: {}", e.getMessage());
+        }
     }
 
     /**

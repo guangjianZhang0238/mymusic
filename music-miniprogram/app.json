@@ -1,15 +1,47 @@
 {
   "pages": [
-    "pages/index/index",
-    "pages/logs/logs"
+    "pages/login/login",
+    "pages/home/home",
+    "pages/discover/discover",
+    "pages/library/library",
+    "pages/playlist/playlist",
+    "pages/player/player",
+    "pages/lyrics/lyrics",
+    "pages/profile/profile",
+    "pages/artist-songs/artist-songs"
   ],
   "window": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "Weixin",
-    "navigationBarBackgroundColor": "#ffffff"
+    "navigationBarTitleText": "佩奇妙妙屋",
+    "navigationBarBackgroundColor": "#ffffff",
+    "backgroundColor": "#f7f7fb",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#9aa0a6",
+    "selectedColor": "#ff7aa2",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/home/home",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/discover/discover",
+        "text": "发现"
+      },
+      {
+        "pagePath": "pages/library/library",
+        "text": "歌单"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
   },
   "style": "v2",
   "componentFramework": "glass-easel",
-  "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents"
+  "sitemapLocation": "sitemap.json"
 }

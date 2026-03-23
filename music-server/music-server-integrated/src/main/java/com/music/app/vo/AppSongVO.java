@@ -3,9 +3,13 @@ package com.music.app.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.io.Serializable;
+
 @Data
 @Schema(description = "App端歌曲信息")
-public class AppSongVO {
+public class AppSongVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Schema(description = "歌曲ID")
     private Long id;
@@ -30,6 +34,9 @@ public class AppSongVO {
 
     @Schema(description = "专辑封面")
     private String albumCover;
+
+    @Schema(description = "歌手封面")
+    private String artistCover;
 
     @Schema(description = "文件路径")
     private String filePath;

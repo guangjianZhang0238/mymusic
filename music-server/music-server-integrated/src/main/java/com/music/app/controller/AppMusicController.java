@@ -18,6 +18,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.ArrayList;
 import java.util.List;
 
 @Tag(name = "App端音乐接口")
@@ -57,10 +59,11 @@ public class AppMusicController {
     public Result<Page<AppAlbumVO>> albumPage(
             @RequestParam(defaultValue = "1") Integer current,
             @RequestParam(defaultValue = "20") Integer size,
-            @RequestParam(required = false) String keyword
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long artistId
     ) {
-        log.info("访问接口：开始查询专辑分页，关键词: {}", keyword);
-        return Result.success(appMusicService.pageAlbums(current, size, keyword));
+        log.info("访问接口：开始查询专辑分页，关键词: {}, 歌手ID: {}", keyword, artistId);
+        return Result.success(appMusicService.pageAlbums(current, size, keyword, artistId));
     }
 
     @Operation(summary = "App端歌手分页")
@@ -76,9 +79,45 @@ public class AppMusicController {
 
     @Operation(summary = "App端根据ID列表获取歌曲")
     @GetMapping("/song/by-ids")
-    public Result<List<AppSongVO>> songsByIds(@RequestParam List<Long> ids) {
-        log.info("访问接口：开始根据ID列表获取歌曲，ID数量: {}", ids != null ? ids.size() : 0);
-        return Result.success(appMusicService.getSongsByIds(ids));
+    public Result<List<AppSongVO>> songsByIds(
+            @RequestParam(value = "ids", required = false) List<Long> ids,
+            HttpServletRequest request) {
+        List<Long> finalIds = ids;
+        if (finalIds == null || finalIds.isEmpty()) {
+            finalIds = parseJsonLikeIds(request.getParameter("ids"));
+        }
+        log.info("访问接口：开始根据ID列表获取歌曲，ID数量: {}", finalIds != null ? finalIds.size() : 0);
+        return Result.success(appMusicService.getSongsByIds(finalIds));
+    }
+
+    /**
+     * 兼容小程序把 ids 作为 "[1,2,3]" 传入 query string 的场景。
+     */
+    private List<Long> parseJsonLikeIds(String rawIds) {
+        if (rawIds == null || rawIds.isBlank()) {
+            return List.of();
+        }
+        String normalized = rawIds.trim();
+        if (normalized.startsWith("[") && normalized.endsWith("]")) {
+            normalized = normalized.substring(1, normalized.length() - 1);
+        }
+        if (normalized.isBlank()) {
+            return List.of();
+        }
+        String[] parts = normalized.split(",");
+        List<Long> result = new ArrayList<>(parts.length);
+        for (String part : parts) {
+            String token = part == null ? "" : part.trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            try {
+                result.add(Long.parseLong(token));
+            } catch (NumberFormatException ex) {
+                log.warn("忽略非法歌曲ID参数: {}", token);
+            }
+        }
+        return result;
     }
 
     @Operation(summary = "App端专辑详情")

@@ -1,0 +1,27 @@
+.lyrics-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.title {
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.artist {
+  margin-top: 8rpx;
+}
+
+.lyrics {
+  margin-top: 8rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  color: #475569;
+  line-height: 1.9;
+}
+
+.line {
+  font-size: 26rpx;
+}

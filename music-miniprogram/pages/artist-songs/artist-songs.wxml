@@ -1,0 +1,19 @@
+<view class="artist-songs-page page-shell">
+  <view class="card header glow-card">
+    <view class="title">{{artistName}}</view>
+    <view class="subtitle text-muted">热门歌曲</view>
+  </view>
+
+  <view class="song-list">
+    <block wx:for="{{songs}}" wx:key="id">
+      <view class="song-card" bindtap="playSong" data-id="{{item.id}}">
+        <image class="cover" src="{{item.albumCover || item.artistCover || item.coverUrl || defaultSongCover}}" mode="aspectFill" />
+        <view class="info">
+          <view class="name">{{item.title || item.name}}</view>
+          <view class="artist text-muted">{{item.artistName || item.artistNames}}</view>
+        </view>
+      </view>
+    </block>
+    <view wx:if="{{!songs.length}}" class="text-muted empty">暂无歌曲</view>
+  </view>
+</view>

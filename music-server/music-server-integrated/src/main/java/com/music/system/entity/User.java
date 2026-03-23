@@ -16,6 +16,8 @@ public class User extends BaseEntity {
     private String nickname;
     private String avatar;
     private String phone;
+    private String unionId;
+    private String openId;
     private String email;
     private Integer status;
     private Integer role;

@@ -64,8 +64,8 @@ public class AppMusicServiceImpl implements AppMusicService {
     }
 
     @Override
-    public Page<AppAlbumVO> pageAlbums(Integer current, Integer size, String keyword) {
-        Page<AlbumVO> page = albumService.pageList(keyword, null, current == null ? 1 : current, size == null ? 10 : size);
+    public Page<AppAlbumVO> pageAlbums(Integer current, Integer size, String keyword, Long artistId) {
+        Page<AlbumVO> page = albumService.pageList(keyword, artistId, current == null ? 1 : current, size == null ? 10 : size);
         Page<AppAlbumVO> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
         result.setRecords(page.getRecords().stream().map(this::toAppAlbumVO).toList());
         return result;
@@ -98,14 +98,18 @@ public class AppMusicServiceImpl implements AppMusicService {
         vo.setId(song.getId());
         vo.setTitle(song.getTitle());
         vo.setTitleEn(song.getTitleEn());
+        vo.setAlbumId(song.getAlbumId());
         vo.setFilePath(song.getFilePath());
         vo.setHasLyrics(song.getHasLyrics());
+        vo.setDuration(song.getDuration());
+        vo.setPlayCount(song.getPlayCount());
 
         // 获取歌手名称（主唱 + 合唱歌手）
         if (song.getArtistId() != null) {
             Artist artist = artistMapper.selectById(song.getArtistId());
             if (artist != null) {
                 vo.setArtistName(artist.getName());
+                vo.setArtistCover(artist.getAvatar());
             }
         }
         if (song.getArtistNames() != null && !song.getArtistNames().isEmpty()) {
@@ -132,6 +136,14 @@ public class AppMusicServiceImpl implements AppMusicService {
     private AppSongVO toAppSongVO(SongVO vo) {
         AppSongVO app = new AppSongVO();
         BeanUtils.copyProperties(vo, app);
+
+        if (vo != null && vo.getArtistId() != null) {
+            Artist artist = artistMapper.selectById(vo.getArtistId());
+            if (artist != null) {
+                app.setArtistCover(artist.getAvatar());
+            }
+        }
+
         return app;
     }
 
@@ -172,17 +184,22 @@ public class AppMusicServiceImpl implements AppMusicService {
     @Override
     public List<AppSongVO> getArtistTopSongs(Long artistId, int limit) {
         if (artistId == null) return new ArrayList<>();
+
         LambdaQueryWrapper<SongArtist> saWrapper = new LambdaQueryWrapper<>();
         saWrapper.eq(SongArtist::getArtistId, artistId);
         List<Long> songIdsFromLink = songArtistMapper.selectList(saWrapper).stream()
-                .map(SongArtist::getSongId).distinct().toList();
+                .map(SongArtist::getSongId)
+                .distinct()
+                .toList();
+
         LambdaQueryWrapper<Song> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Song::getStatus, 1);
+        // 与首页“热门歌手榜”的 songCount 口径保持一致：不过滤 status，避免出现“有歌曲数量但详情页为空”
         if (songIdsFromLink.isEmpty()) {
             wrapper.eq(Song::getArtistId, artistId);
         } else {
             wrapper.and(w -> w.eq(Song::getArtistId, artistId).or().in(Song::getId, songIdsFromLink));
         }
+
         wrapper.orderByDesc(Song::getPlayCount).last("LIMIT " + Math.min(limit, 50));
         List<Song> songs = songMapper.selectList(wrapper);
         return songs.stream().map(song -> {

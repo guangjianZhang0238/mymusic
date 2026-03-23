@@ -3,22 +3,36 @@ package com.music.common.config;
 import io.lettuce.core.ClientOptions;
 import io.lettuce.core.SocketOptions;
 import org.apache.commons.pool2.impl.GenericObjectPoolConfig;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.annotation.CachingConfigurer;
+import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceClientConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettucePoolingClientConfiguration;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import java.time.Duration;
 
 @Configuration
-public class RedisConfig {
+@EnableCaching
+public class RedisConfig implements CachingConfigurer {
+
+    private static final Logger log = LoggerFactory.getLogger(RedisConfig.class);
 
     @Value("${spring.redis.host:127.0.0.1}")
     private String redisHost;
@@ -84,7 +98,7 @@ public class RedisConfig {
         template.setConnectionFactory(connectionFactory);
 
         StringRedisSerializer stringSerializer = new StringRedisSerializer();
-        Jackson2JsonRedisSerializer<Object> jsonSerializer = new Jackson2JsonRedisSerializer<>(Object.class);
+        GenericJackson2JsonRedisSerializer jsonSerializer = cacheJsonSerializer();
 
         template.setKeySerializer(stringSerializer);
         template.setHashKeySerializer(stringSerializer);
@@ -93,5 +107,68 @@ public class RedisConfig {
 
         template.afterPropertiesSet();
         return template;
+    }
+
+    private GenericJackson2JsonRedisSerializer cacheJsonSerializer() {
+        // 与历史缓存保持一致：使用 @class 属性写入类型信息（避免 WRAPPER_ARRAY/PROPERTY 混用导致反序列化失败）
+        return new GenericJackson2JsonRedisSerializer("@class");
+    }
+
+    @Bean
+    @Override
+    public CacheManager cacheManager() {
+        RedisConnectionFactory connectionFactory = redisConnectionFactory();
+        RedisSerializationContext.SerializationPair<String> keySerializationPair =
+                RedisSerializationContext.SerializationPair.fromSerializer(RedisSerializer.string());
+        RedisSerializationContext.SerializationPair<Object> valueSerializationPair =
+                RedisSerializationContext.SerializationPair.fromSerializer(cacheJsonSerializer());
+
+        RedisCacheConfiguration defaultCacheConfig = RedisCacheConfiguration.defaultCacheConfig()
+                // 增加版本前缀，避免读取历史序列化格式不兼容的缓存
+                .computePrefixWith(cacheName -> "v2:" + cacheName + "::")
+                .serializeKeysWith(keySerializationPair)
+                .serializeValuesWith(valueSerializationPair)
+                .disableCachingNullValues()
+                .entryTtl(Duration.ofMinutes(10));
+
+        return RedisCacheManager.builder(connectionFactory)
+                .cacheDefaults(defaultCacheConfig)
+                .transactionAware()
+                .build();
+    }
+
+    /**
+     * 缓存读取异常降级：当历史脏缓存反序列化失败时，记录日志并回源数据库，避免接口直接 500。
+     */
+    @Bean
+    @Override
+    public CacheErrorHandler errorHandler() {
+        return new CacheErrorHandler() {
+            @Override
+            public void handleCacheGetError(RuntimeException exception, Cache cache, Object key) {
+                log.warn("Redis cache get error, cacheName={}, key={}, fallback to source. reason={}",
+                        cache != null ? cache.getName() : "unknown", key, exception.getMessage());
+                // 吞掉异常，允许业务继续执行
+            }
+
+            @Override
+            public void handleCachePutError(RuntimeException exception, Cache cache, Object key, Object value) {
+                log.warn("Redis cache put error, cacheName={}, key={}, skip caching. reason={}",
+                        cache != null ? cache.getName() : "unknown", key, exception.getMessage());
+                // 吞掉异常，避免因缓存不可用影响主流程
+            }
+
+            @Override
+            public void handleCacheEvictError(RuntimeException exception, Cache cache, Object key) {
+                log.warn("Redis cache evict error, cacheName={}, key={}, reason={}",
+                        cache != null ? cache.getName() : "unknown", key, exception.getMessage());
+            }
+
+            @Override
+            public void handleCacheClearError(RuntimeException exception, Cache cache) {
+                log.warn("Redis cache clear error, cacheName={}, reason={}",
+                        cache != null ? cache.getName() : "unknown", exception.getMessage());
+            }
+        };
     }
 }

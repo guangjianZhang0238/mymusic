@@ -1,0 +1,95 @@
+.playlist-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.header {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+}
+
+.cover {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 20rpx;
+}
+
+.info {
+  flex: 1;
+}
+
+.name {
+  font-weight: 600;
+  font-size: 30rpx;
+}
+
+.desc {
+  margin-top: 6rpx;
+}
+
+.count {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+}
+
+.add-area {
+  margin-top: 12rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.search-row {
+  margin-top: 16rpx;
+  display: flex;
+  gap: 12rpx;
+}
+
+.input {
+  flex: 1;
+}
+
+.btn-primary {
+  font-size: 24rpx;
+  padding: 0 24rpx;
+}
+
+.song-list {
+  margin-top: 20rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.song-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 20rpx;
+  padding: 16rpx 18rpx;
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10rpx 24rpx rgba(71, 85, 105, 0.14);
+}
+
+.song-main {
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  flex: 1;
+}
+
+.cover-small {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 18rpx;
+}
+
+.artist {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+}

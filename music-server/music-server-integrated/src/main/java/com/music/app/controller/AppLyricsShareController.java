@@ -60,7 +60,7 @@ public class AppLyricsShareController {
     }
 
     @Operation(summary = "删除歌词分享")
-    @DeleteMapping("/{shareId}")
+    @DeleteMapping("/{shareId:\\d+}")
     public Result<Void> deleteShare(@PathVariable Long shareId) {
         log.info("访问接口：开始删除歌词分享，分享ID: {}", shareId);
         Long userId = getCurrentUserId();
@@ -85,7 +85,7 @@ public class AppLyricsShareController {
     }
 
     @Operation(summary = "获取歌词的分享列表（分页）")
-    @GetMapping("/lyrics/{lyricsId}")
+    @GetMapping("/lyrics/{lyricsId:\\d+}")
     public Result<PageResult<AppLyricsShareVO>> getLyricsShares(
             @PathVariable Long lyricsId,
             @RequestParam(defaultValue = "1") int page,
@@ -101,7 +101,7 @@ public class AppLyricsShareController {
     }
 
     @Operation(summary = "获取分享详情")
-    @GetMapping("/{shareId}")
+    @GetMapping("/{shareId:\\d+}")
     public Result<AppLyricsShareVO> getShareDetail(@PathVariable Long shareId) {
         log.info("访问接口：开始获取分享详情，分享ID: {}", shareId);
         LyricsShareDTO dto = lyricsShareService.getShareDetail(shareId);

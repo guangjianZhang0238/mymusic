@@ -1,0 +1,34 @@
+<view class="discover-page page-shell">
+  <view class="card scene glow-card">
+    <view class="section-title">每日推荐</view>
+    <view class="song-list">
+      <block wx:for="{{daily}}" wx:key="id">
+        <view class="song-card" bindtap="playSong" data-section="daily" data-id="{{item.id}}">
+          <image class="cover" src="{{item.albumCover || item.artistCover || item.coverUrl || defaultSongCover}}" mode="aspectFill" />
+          <view class="info">
+            <view class="name">{{item.title || item.name}}</view>
+            <view class="artist text-muted">{{item.artistName || item.artistNames}}</view>
+          </view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="card personal glow-card">
+    <view class="section-header">
+      <view class="section-title">今日惊喜盲盒</view>
+      <view class="refresh" bindtap="refreshSurprise">换一批</view>
+    </view>
+    <view class="seed text-muted">更新时间：{{surpriseSeed}}</view>
+    <view class="song-grid">
+      <block wx:for="{{surprise}}" wx:key="id">
+        <view class="song-tile" bindtap="playSong" data-section="surprise" data-id="{{item.id}}">
+          <image class="tile-cover" src="{{item.albumCover || item.artistCover || item.coverUrl || defaultSongCover}}" mode="aspectFill" />
+          <view class="tile-name">{{item.title || item.name}}</view>
+          <view class="tile-artist text-muted">{{item.artistName || item.artistNames}}</view>
+        </view>
+      </block>
+      <view wx:if="{{!surprise.length}}" class="text-muted">暂时没有惊喜，稍后再试</view>
+    </view>
+  </view>
+</view>

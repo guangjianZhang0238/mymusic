@@ -34,6 +34,12 @@ public class StorageConfig {
      * 在数据根目录下的临时目录，相对路径（默认使用 MusicConstants 中的目录名）。
      */
     private String tempPath = MusicConstants.DEFAULT_TEMP_PATH;
+
+    /**
+     * 在数据根目录下的用户文件目录（头像、歌单封面等）。
+     */
+    private String userPath = "user_files";
+
     // 单个文件最大上传大小（字节），默认 2GB（可被 application.yml 的 music.storage.max-file-size 覆盖）
     private long maxFileSize = 2L * 1024 * 1024 * 1024;
     private int uploadThreadCount = 5;
@@ -70,6 +76,10 @@ public class StorageConfig {
         return resolvePathUnderRoot(tempPath).toString();
     }
 
+    public String getUserPath() {
+        return resolvePathUnderRoot(userPath).toString();
+    }
+
     private Path resolvePathUnderRoot(String child) {
         Path root = getDataRoot();
         if (child == null || child.isBlank()) {
@@ -86,6 +96,7 @@ public class StorageConfig {
     public void ensureStorageDirectories() {
         ensureDir(getBasePath());
         ensureDir(getTempPath());
+        ensureDir(getUserPath());
     }
 
     private void ensureDir(String path) {

@@ -1,0 +1,89 @@
+.discover-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.song-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.song-card {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 20rpx;
+  padding: 18rpx;
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  box-shadow: 0 10rpx 24rpx rgba(71, 85, 105, 0.14);
+}
+
+.cover {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 18rpx;
+}
+
+.info {
+  flex: 1;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.artist {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.refresh {
+  font-size: 24rpx;
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+}
+
+.seed {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+}
+
+.song-grid {
+  margin-top: 12rpx;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16rpx;
+}
+
+.song-tile {
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 22rpx;
+  padding: 16rpx;
+  box-shadow: 0 10rpx 24rpx rgba(71, 85, 105, 0.14);
+}
+
+.tile-cover {
+  width: 100%;
+  height: 200rpx;
+  border-radius: 18rpx;
+}
+
+.tile-name {
+  margin-top: 12rpx;
+  font-weight: 600;
+}
+
+.tile-artist {
+  font-size: 22rpx;
+  margin-top: 6rpx;
+}

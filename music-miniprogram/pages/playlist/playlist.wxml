@@ -1,0 +1,47 @@
+<view class="playlist-page page-shell">
+  <view class="card header glow-card">
+    <image class="cover" src="{{playlist.coverUrl || defaultCover}}" mode="aspectFill" />
+    <view class="info">
+      <view class="name">{{playlist.name}}</view>
+      <view class="desc text-muted">{{playlist.description || '把喜欢的歌放一起'}}</view>
+      <view class="count text-muted">{{songs.length}} 首歌曲</view>
+    </view>
+  </view>
+
+  <view class="card add-area">
+    <view class="section-title">添加歌曲</view>
+    <view class="search-row">
+      <input class="input" placeholder="搜索歌曲名称" value="{{keyword}}" bindinput="onKeywordInput" />
+      <button class="btn-primary" bindtap="searchSongs">搜索</button>
+    </view>
+    <view class="song-list">
+      <block wx:for="{{searchResults}}" wx:key="id">
+        <view class="song-card">
+          <view class="song-main" bindtap="playSong" data-id="{{item.id}}">
+            <image class="cover-small" src="{{item.albumCover || item.artistCover || item.coverUrl || defaultCover}}" mode="aspectFill" />
+            <view class="info">
+              <view class="name">{{item.title || item.name}}</view>
+              <view class="artist text-muted">{{item.artistName || item.artistNames}}</view>
+            </view>
+          </view>
+          <button class="btn-text" bindtap="addSong" data-id="{{item.id}}">加入</button>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="song-list">
+    <block wx:for="{{songs}}" wx:key="id">
+      <view class="song-card">
+        <view class="song-main" bindtap="playSong" data-id="{{item.id}}">
+          <image class="cover-small" src="{{item.albumCover || item.artistCover || item.coverUrl || defaultCover}}" mode="aspectFill" />
+          <view class="info">
+            <view class="name">{{item.title || item.name}}</view>
+            <view class="artist text-muted">{{item.artistName || item.artistNames}}</view>
+          </view>
+        </view>
+        <button class="btn-text danger" bindtap="removeSong" data-id="{{item.id}}">移除</button>
+      </view>
+    </block>
+  </view>
+</view>

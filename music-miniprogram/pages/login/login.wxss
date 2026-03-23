@@ -1,0 +1,98 @@
+.login-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.hero {
+  padding: 44rpx 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+  align-items: center;
+  text-align: center;
+}
+
+.title {
+  font-size: 52rpx;
+  font-weight: 700;
+  color: #ff6fa4;
+}
+
+.subtitle {
+  color: #6b7280;
+  font-size: 26rpx;
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.mode-switch {
+  display: flex;
+  background: rgba(244, 114, 182, 0.12);
+  border-radius: 999rpx;
+  padding: 6rpx;
+}
+
+.mode-item {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 0;
+  border-radius: 999rpx;
+  color: #7b8190;
+  font-size: 26rpx;
+  transition: all 0.2s ease;
+}
+
+.mode-item.active {
+  background: linear-gradient(135deg, #ff8fb8, #7dd3fc);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: 0 8rpx 18rpx rgba(125, 211, 252, 0.3);
+}
+
+.form-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+}
+
+.label {
+  color: #5f6b7a;
+  font-size: 24rpx;
+  font-weight: 500;
+}
+
+.input {
+  border: 1rpx solid rgba(148, 163, 184, 0.35);
+  border-radius: 16rpx;
+  padding: 16rpx 18rpx;
+  font-size: 26rpx;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1f2937;
+}
+
+.input:focus {
+  border-color: rgba(244, 114, 182, 0.5);
+}
+
+.error-text {
+  color: #ef476f;
+  font-size: 24rpx;
+}
+
+.submit-btn {
+  width: 100%;
+  margin-top: 6rpx;
+  border-radius: 999rpx;
+}
+
+.mode-tip {
+  margin-top: 4rpx;
+  text-align: center;
+  color: #6b7280;
+  font-size: 24rpx;
+}

@@ -1,0 +1,25 @@
+<view class="profile-page page-shell">
+  <view class="card profile glow-card">
+    <image class="avatar" src="{{userInfo.avatarUrl || userInfo.avatar || defaultAvatar}}" mode="aspectFill" bindtap="chooseAvatar" />
+    <view class="info">
+      <view class="name">{{userInfo.nickname || '音乐听友'}}</view>
+      <view class="phone text-muted">{{userInfo.phone || '未绑定手机号'}}</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="section-title">我的收藏</view>
+    <view class="favorites">
+      <block wx:for="{{favorites}}" wx:key="id">
+        <view class="song-card" bindtap="playSong" data-id="{{item.id}}">
+          <image class="cover" src="{{item.albumCover || item.artistCover || item.coverUrl || defaultSongCover}}" mode="aspectFill" />
+          <view class="info">
+            <view class="name">{{item.title || item.name}}</view>
+            <view class="artist text-muted">{{item.artistName || item.artistNames}}</view>
+          </view>
+        </view>
+      </block>
+      <view wx:if="{{!favorites.length}}" class="text-muted">还没有收藏任何歌曲</view>
+    </view>
+  </view>
+</view>
