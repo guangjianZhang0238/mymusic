@@ -9,6 +9,8 @@ export const getSceneRecommendApi = (limit = 10) => request.get<Song[]>('/web/re
 export const getArtistPageApi = (current = 1, size = 20, keyword = '') =>
   request.get<PageResult<Artist>>('/app/music/artist/page', { params: { current, size, keyword } })
 
+export const getHotArtistsApi = (limit = 20) => request.get<Artist[]>('/app/music/artist/hot', { params: { limit } })
+
 export const getArtistDetailApi = (artistId: number) => request.get<Artist>(`/app/music/artist/${artistId}`)
 export const getArtistTopSongsApi = (artistId: number, limit = 20) =>
   request.get<Song[]>(`/app/music/artist/${artistId}/top-songs`, { params: { limit } })

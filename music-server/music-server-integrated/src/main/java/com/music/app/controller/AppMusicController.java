@@ -54,6 +54,15 @@ public class AppMusicController {
         return Result.success(appMusicService.hotSongs());
     }
 
+    @Operation(summary = "App端热门歌手")
+    @GetMapping("/artist/hot")
+    public Result<List<AppArtistVO>> hotArtists(
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        log.info("访问接口：查询热门歌手，数量: {}", limit);
+        return Result.success(appMusicService.hotArtists(limit));
+    }
+
     @Operation(summary = "App端专辑分页")
     @GetMapping("/album/page")
     public Result<Page<AppAlbumVO>> albumPage(
@@ -80,12 +89,11 @@ public class AppMusicController {
     @Operation(summary = "App端根据ID列表获取歌曲")
     @GetMapping("/song/by-ids")
     public Result<List<AppSongVO>> songsByIds(
-            @RequestParam(value = "ids", required = false) List<Long> ids,
+            @RequestParam(value = "ids", required = false) String idsRaw,
             HttpServletRequest request) {
-        List<Long> finalIds = ids;
-        if (finalIds == null || finalIds.isEmpty()) {
-            finalIds = parseJsonLikeIds(request.getParameter("ids"));
-        }
+        // 避免 Spring 直接把 ids 转成 List<Long> 时触发 MethodArgumentTypeMismatchException
+        // 例如 ids=hot / ids=[hot] 时应当返回空而不是 500。
+        List<Long> finalIds = idsRaw != null ? parseJsonLikeIds(idsRaw) : parseJsonLikeIds(request.getParameter("ids"));
         log.info("访问接口：开始根据ID列表获取歌曲，ID数量: {}", finalIds != null ? finalIds.size() : 0);
         return Result.success(appMusicService.getSongsByIds(finalIds));
     }
@@ -128,14 +136,14 @@ public class AppMusicController {
     }
 
     @Operation(summary = "App端歌手详情")
-    @GetMapping("/artist/{artistId}")
+    @GetMapping("/artist/{artistId:\\d+}")
     public Result<AppArtistVO> artistDetail(@PathVariable Long artistId) {
         log.info("访问接口：开始查询歌手详情，歌手ID: {}", artistId);
         return Result.success(appMusicService.getArtistDetail(artistId));
     }
     
     @Operation(summary = "App端歌手热门歌曲")
-    @GetMapping("/artist/{artistId}/top-songs")
+    @GetMapping("/artist/{artistId:\\d+}/top-songs")
     public Result<List<AppSongVO>> artistTopSongs(
             @PathVariable Long artistId,
             @RequestParam(defaultValue = "20") int limit) {

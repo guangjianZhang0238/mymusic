@@ -2,7 +2,9 @@
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { getLyricsApi, getSongsByIdsApi } from '@/api/music'
+import { normalizeLyrics } from '@/utils/lyrics'
 import StateBlock from '@/components/StateBlock.vue'
+import { getDisplaySongTitle } from '@/utils/songTitle'
 
 const route = useRoute()
 const songId = Number(route.params.songId)
@@ -18,9 +20,9 @@ onMounted(async () => {
   try {
     const [songRows, lyric] = await Promise.all([getSongsByIdsApi([songId]), getLyricsApi(songId)])
     const song = songRows[0]
-    title.value = song?.name || song?.title || ''
+    title.value = song ? getDisplaySongTitle(song) : ''
     artist.value = song?.artistName || song?.artistNames || ''
-    lines.value = (lyric?.lines || []).map((item: any) => item.text)
+    lines.value = normalizeLyrics(lyric?.lines || []).map((item) => item.text)
   } catch (e: any) {
     error.value = e?.message || '歌词页加载失败'
   } finally {

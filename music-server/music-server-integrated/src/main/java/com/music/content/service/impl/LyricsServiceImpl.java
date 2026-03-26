@@ -146,8 +146,7 @@ public class LyricsServiceImpl extends ServiceImpl<LyricsMapper, Lyrics> impleme
     
     @Override
     public LyricsVO getBySongId(Long songId) {
-        Lyrics lyrics = getOne(new LambdaQueryWrapper<Lyrics>()
-                .eq(Lyrics::getSongId, songId));
+        Lyrics lyrics = findPreferredLyricsBySongId(songId);
         
         if (lyrics == null) {
             return null;
@@ -192,8 +191,7 @@ public class LyricsServiceImpl extends ServiceImpl<LyricsMapper, Lyrics> impleme
         }
         
         // 查找是否已有该歌曲的歌词
-        Lyrics existing = getOne(new LambdaQueryWrapper<Lyrics>()
-                .eq(Lyrics::getSongId, dto.getSongId()));
+        Lyrics existing = findPreferredLyricsBySongId(dto.getSongId());
         
         if (existing != null) {
             // 如果已有歌词，则更新
@@ -338,8 +336,7 @@ public class LyricsServiceImpl extends ServiceImpl<LyricsMapper, Lyrics> impleme
         String relativeFilePath = LYRICS_FOLDER + File.separator + fileName;
         
         // 查找或创建歌词记录
-        Lyrics existing = getOne(new LambdaQueryWrapper<Lyrics>()
-                .eq(Lyrics::getSongId, songId));
+        Lyrics existing = findPreferredLyricsBySongId(songId);
         
         if (existing != null) {
             // 更新现有歌词
@@ -373,8 +370,7 @@ public class LyricsServiceImpl extends ServiceImpl<LyricsMapper, Lyrics> impleme
     
     @Override
     public void updateLyricsOffset(Long songId, Double lyricsOffset) {
-        Lyrics lyrics = getOne(new LambdaQueryWrapper<Lyrics>()
-                .eq(Lyrics::getSongId, songId));
+        Lyrics lyrics = findPreferredLyricsBySongId(songId);
         
         if (lyrics != null) {
             lyrics.setLyricsOffset(lyricsOffset);
@@ -632,9 +628,7 @@ public class LyricsServiceImpl extends ServiceImpl<LyricsMapper, Lyrics> impleme
      * 按song_id覆盖保存歌词（song_id唯一）
      */
     private Lyrics saveOrUpdateLyricsBySongId(Long songId, String lyricsContent, String source, String sourceUrl) {
-        Lyrics existingLyrics = getOne(new LambdaQueryWrapper<Lyrics>()
-                .eq(Lyrics::getSongId, songId)
-                .last("LIMIT 1"));
+        Lyrics existingLyrics = findPreferredLyricsBySongId(songId);
 
         Lyrics lyrics;
         if (existingLyrics != null) {
@@ -664,6 +658,43 @@ public class LyricsServiceImpl extends ServiceImpl<LyricsMapper, Lyrics> impleme
         }
 
         return lyrics;
+    }
+
+    /**
+     * 获取歌曲首选歌词记录：
+     * 1) 优先使用 song.lyricsId 指向的记录（如果存在且属于当前 songId）；
+     * 2) 否则取该 songId 下 ID 最新的一条。
+     *
+     * 目的：兼容历史脏数据（同一首歌多条歌词），避免 getOne/selectOne 抛出 TooManyResultsException。
+     */
+    private Lyrics findPreferredLyricsBySongId(Long songId) {
+        if (songId == null) {
+            return null;
+        }
+
+        List<Lyrics> lyricsList = list(new LambdaQueryWrapper<Lyrics>()
+                .eq(Lyrics::getSongId, songId)
+                .orderByDesc(Lyrics::getId));
+
+        if (lyricsList == null || lyricsList.isEmpty()) {
+            return null;
+        }
+
+        if (lyricsList.size() > 1) {
+            log.warn("检测到歌曲ID {} 存在 {} 条歌词记录，将按首选规则处理", songId, lyricsList.size());
+        }
+
+        Song song = songMapper.selectById(songId);
+        if (song != null && song.getLyricsId() != null) {
+            Long bindLyricsId = song.getLyricsId();
+            for (Lyrics item : lyricsList) {
+                if (bindLyricsId.equals(item.getId())) {
+                    return item;
+                }
+            }
+        }
+
+        return lyricsList.get(0);
     }
 
     /**

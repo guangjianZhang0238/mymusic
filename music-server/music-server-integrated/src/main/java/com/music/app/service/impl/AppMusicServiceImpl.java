@@ -29,7 +29,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +60,74 @@ public class AppMusicServiceImpl implements AppMusicService {
     @Override
     public List<AppSongVO> hotSongs() {
         return songService.getHotSongs().stream().map(this::toAppSongVO).toList();
+    }
+
+    @Override
+    public List<AppArtistVO> hotArtists(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+
+        // 口径与 ArtistServiceImpl 的 songCount 一致：
+        // 1) 主唱（content_song.artist_id）参与
+        // 2) 合唱（content_song_artist.artist_id）参与
+        // songCount = 去重后的歌曲数量（不过滤歌曲 status）
+        java.util.Map<Long, java.util.Set<Long>> artistToSongIds = new java.util.HashMap<>();
+
+        // 主唱参与的歌曲
+        LambdaQueryWrapper<Song> mainSongWrapper = new LambdaQueryWrapper<>();
+        mainSongWrapper.select(Song::getId, Song::getArtistId);
+        List<Song> mainSongs = songMapper.selectList(mainSongWrapper);
+        for (Song s : mainSongs) {
+            if (s.getId() == null || s.getArtistId() == null) continue;
+            artistToSongIds
+                    .computeIfAbsent(s.getArtistId(), k -> new java.util.HashSet<>())
+                    .add(s.getId());
+        }
+
+        // 合唱参与的歌曲
+        LambdaQueryWrapper<SongArtist> linkWrapper = new LambdaQueryWrapper<>();
+        linkWrapper.select(SongArtist::getSongId, SongArtist::getArtistId);
+        List<SongArtist> links = songArtistMapper.selectList(linkWrapper);
+        for (SongArtist sa : links) {
+            if (sa.getSongId() == null || sa.getArtistId() == null) continue;
+            artistToSongIds
+                    .computeIfAbsent(sa.getArtistId(), k -> new java.util.HashSet<>())
+                    .add(sa.getSongId());
+        }
+
+        if (artistToSongIds.isEmpty()) {
+            return List.of();
+        }
+
+        java.util.List<java.util.Map.Entry<Long, java.util.Set<Long>>> entries =
+                new java.util.ArrayList<>(artistToSongIds.entrySet());
+        entries.sort((a, b) -> Integer.compare(b.getValue().size(), a.getValue().size()));
+
+        int finalSize = Math.min(limit, entries.size());
+        java.util.List<Long> topArtistIds = entries.stream()
+                .limit(finalSize)
+                .map(java.util.Map.Entry::getKey)
+                .toList();
+
+        List<Artist> artists = artistMapper.selectBatchIds(topArtistIds);
+        java.util.Map<Long, Artist> artistMap = artists.stream()
+                .collect(java.util.stream.Collectors.toMap(Artist::getId, a -> a));
+
+        java.util.List<AppArtistVO> result = new java.util.ArrayList<>(finalSize);
+        for (int i = 0; i < finalSize; i++) {
+            java.util.Map.Entry<Long, java.util.Set<Long>> entry = entries.get(i);
+            Long artistId = entry.getKey();
+            Artist artist = artistMap.get(artistId);
+            if (artist == null) continue;
+
+            AppArtistVO vo = new AppArtistVO();
+            BeanUtils.copyProperties(artist, vo);
+            vo.setSongCount(entry.getValue().size());
+            result.add(vo);
+        }
+
+        return result;
     }
 
     @Override

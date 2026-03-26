@@ -7,6 +7,7 @@ import { useUserStore } from '@/stores/user'
 import { usePlayerStore } from '@/stores/player'
 import StateBlock from '@/components/StateBlock.vue'
 import { ElMessage } from 'element-plus'
+import { getDisplaySongTitle } from '@/utils/songTitle'
 
 const router = useRouter()
 const user = useUserStore()
@@ -67,7 +68,11 @@ const play = async (songId: number) => {
         <template #header>我的收藏（{{ favorites.length }}）</template>
         <StateBlock :loading="loading" :error="error" :empty="!favorites.length" empty-text="暂无收藏歌曲">
           <el-table :data="favorites">
-            <el-table-column prop="name" label="歌曲" min-width="180" />
+            <el-table-column label="歌曲" min-width="180">
+              <template #default="{ row }">
+                {{ getDisplaySongTitle(row) }}
+              </template>
+            </el-table-column>
             <el-table-column prop="artistName" label="歌手" min-width="140" />
             <el-table-column label="操作" width="140">
               <template #default="{ row }">

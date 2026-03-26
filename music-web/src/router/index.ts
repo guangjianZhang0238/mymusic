@@ -14,6 +14,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/search', component: () => import('@/views/SearchView.vue'), meta: { title: '搜索' } },
   { path: '/album/:id', component: () => import('@/views/AlbumDetailView.vue'), meta: { title: '专辑详情' } },
   { path: '/artist/:id', component: () => import('@/views/ArtistDetailView.vue'), meta: { title: '歌手详情' } },
+  { path: '/artist-rank', component: () => import('@/views/ArtistRankView.vue'), meta: { title: '歌手排行榜' } },
   { path: '/settings', component: () => import('@/views/SettingsView.vue'), meta: { title: '设置' } },
   { path: '/feedback', component: () => import('@/views/FeedbackView.vue'), meta: { title: '反馈' } },
   { path: '/lyrics-share', component: () => import('@/views/LyricsShareView.vue'), meta: { title: '歌词分享' } },

@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { usePlayerStore } from '@/stores/player'
+import { playerAudio } from '@/utils/playerAudio'
 
 const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
+const player = usePlayerStore()
 
 const menus = [
   { path: '/home', label: '首页' },
@@ -23,6 +27,161 @@ const logout = () => {
   user.logout()
   router.push('/login')
 }
+
+const AUTO_RESUME_ON_RELOAD_KEY = 'music-web:auto-resume-on-reload'
+const RELOAD_PROGRESS_SNAPSHOT_KEY = 'music-web:reload-progress-snapshot'
+
+const readReloadSnapshot = () => {
+  try {
+    const raw = window.localStorage.getItem(RELOAD_PROGRESS_SNAPSHOT_KEY)
+    if (!raw) return { songId: 0, currentTime: 0 }
+    const parsed = JSON.parse(raw)
+    const songId = Number(parsed?.songId || 0)
+    const currentTime = Number(parsed?.currentTime || 0)
+    if (songId > 0 && Number.isFinite(currentTime) && currentTime >= 0) {
+      return { songId, currentTime }
+    }
+  } catch {
+    // ignore
+  }
+  return { songId: 0, currentTime: 0 }
+}
+
+const readAutoResumeOnReload = () => {
+  try {
+    return window.localStorage.getItem(AUTO_RESUME_ON_RELOAD_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const setAutoResumeOnReload = (playing: boolean) => {
+  try {
+    window.localStorage.setItem(AUTO_RESUME_ON_RELOAD_KEY, playing ? '1' : '0')
+  } catch {
+    // ignore
+  }
+}
+
+const saveReloadProgressSnapshot = () => {
+  try {
+    const currentSongId = Number(player.currentSongId || player.queue?.[player.currentIndex] || 0)
+    if (!currentSongId) return
+    const currentTime = Number.isFinite(playerAudio.currentTime) ? playerAudio.currentTime : Number(player.currentTime || 0)
+    const payload = { songId: currentSongId, currentTime: Math.max(currentTime, 0) }
+    window.localStorage.setItem(RELOAD_PROGRESS_SNAPSHOT_KEY, JSON.stringify(payload))
+  } catch {
+    // ignore storage errors
+  }
+}
+
+let shouldRegisterBeforeUnload = false
+const onBeforeUnload = () => {
+  if (route.path.startsWith('/player')) return
+  if (!shouldRegisterBeforeUnload) return
+  // When on /player, PlayerView already persists this snapshot.
+  setAutoResumeOnReload(!playerAudio.paused && !playerAudio.ended)
+  saveReloadProgressSnapshot()
+}
+
+onMounted(async () => {
+  if (route.path === '/login') return
+
+  const isPlayerPage = route.path.startsWith('/player')
+  shouldRegisterBeforeUnload = !isPlayerPage
+
+  // Only non-`/player` pages need global persistence.
+  if (isPlayerPage) return
+
+  window.addEventListener('beforeunload', onBeforeUnload)
+
+  const snapshot = readReloadSnapshot()
+  const shouldResumeAfterReload = readAutoResumeOnReload()
+  if (!snapshot.songId) return
+
+  // Refresh wipes memory store; best-effort re-hydrate so PlayerView can render.
+  try {
+    await player.hydrateFromServer()
+  } catch {
+    // ignore
+  }
+
+  // Align store to the saved songId (hydrateFromServer should already do this, but keep it safe).
+  if (player.queue?.length) {
+    const idx = player.queue.findIndex((id) => Number(id) === Number(snapshot.songId))
+    if (idx >= 0) {
+      player.currentIndex = idx
+      player.currentSongId = player.queue[idx] || 0
+      await player.refreshQueueSongs()
+    } else {
+      try {
+        await player.playBySongId(snapshot.songId)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const targetSrc = `/api/app/music/song/${snapshot.songId}/stream`
+  const sameSource = !!playerAudio.src && playerAudio.src.includes(targetSrc)
+  if (!sameSource) {
+    playerAudio.src = targetSrc
+    playerAudio.load()
+  } else {
+    playerAudio.load()
+  }
+
+  // Wait metadata so we can clamp currentTime safely.
+  const applyPendingTime = () => {
+    const d = playerAudio.duration
+    if (!Number.isFinite(d) || d <= 0) return false
+    const clamped = Math.min(Math.max(snapshot.currentTime, 0), Math.max(d - 0.2, 0))
+    playerAudio.currentTime = clamped
+    player.currentTime = clamped
+    return true
+  }
+
+  let applied = false
+  if (applyPendingTime()) applied = true
+  if (!applied) {
+    await new Promise<void>((resolve) => {
+      const timeout = window.setTimeout(() => {
+        cleanup()
+        resolve()
+      }, 4000)
+      const onReady = () => {
+        if (applyPendingTime()) {
+          cleanup()
+          resolve()
+        }
+      }
+      const cleanup = () => {
+        window.clearTimeout(timeout)
+        playerAudio.removeEventListener('loadedmetadata', onReady)
+        playerAudio.removeEventListener('durationchange', onReady)
+      }
+      playerAudio.addEventListener('loadedmetadata', onReady)
+      playerAudio.addEventListener('durationchange', onReady)
+    })
+  }
+
+  if (shouldResumeAfterReload) {
+    try {
+      await playerAudio.play()
+      player.playing = true
+    } catch {
+      player.playing = false
+    }
+  } else {
+    player.playing = false
+    playerAudio.pause()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (!shouldRegisterBeforeUnload) return
+  window.removeEventListener('beforeunload', onBeforeUnload)
+})
 </script>
 
 <template>

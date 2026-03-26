@@ -13,6 +13,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MultipartException;
 
 import java.io.IOException;
@@ -34,6 +35,19 @@ public class GlobalExceptionHandler {
         String message = fieldError != null ? fieldError.getDefaultMessage() : "参数验证失败";
         log.error("参数验证失败: {}", message);
         return Result.error(400, message);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public Result<Void> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException e,
+            HttpServletRequest request) {
+        String uri = request != null ? request.getRequestURI() : "unknown";
+        String name = e.getName();
+        Class<?> requiredTypeClass = e.getRequiredType();
+        String requiredType = requiredTypeClass != null ? requiredTypeClass.getSimpleName() : "unknown";
+        String value = e.getValue() != null ? String.valueOf(e.getValue()) : "null";
+        log.warn("参数类型不匹配: uri={}, 参数名={}, 期望类型={}, 实际值={}", uri, name, requiredType, value);
+        return Result.error(400, "参数格式错误");
     }
 
     @ExceptionHandler(BindException.class)

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { createPlaylistApi, deletePlaylistApi, getUserPlaylistsApi, updatePlaylistApi, uploadPlaylistCoverApi } from '@/api/music'
+import { addSongToPlaylistApi, createPlaylistApi, deletePlaylistApi, getSongPageApi, getUserPlaylistsApi, updatePlaylistApi, uploadPlaylistCoverApi } from '@/api/music'
 import StateBlock from '@/components/StateBlock.vue'
 import { ElMessage } from 'element-plus'
+import { getDisplaySongTitle } from '@/utils/songTitle'
 
 const router = useRouter()
 const playlists = ref<any[]>([])
@@ -11,6 +12,13 @@ const visible = ref(false)
 const form = reactive({ id: 0, name: '', description: '' })
 const loading = ref(false)
 const error = ref('')
+
+const addVisible = ref(false)
+const addPlaylistId = ref<number | null>(null)
+const searchKey = ref('')
+const searchRows = ref<any[]>([])
+
+const getSongTitle = (song: any) => getDisplaySongTitle(song)
 
 const load = async () => {
   loading.value = true
@@ -74,6 +82,33 @@ const uploadCover = async (id: number, e: Event) => {
     ElMessage.error(e?.message || '上传失败')
   }
 }
+
+const openAddSong = (playlistId: number) => {
+  addPlaylistId.value = playlistId
+  searchKey.value = ''
+  searchRows.value = []
+  addVisible.value = true
+}
+
+const search = async () => {
+  try {
+    const page = await getSongPageApi(1, 20, searchKey.value)
+    searchRows.value = page.records || []
+  } catch (e: any) {
+    ElMessage.error(e?.message || '搜索失败')
+  }
+}
+
+const addSong = async (songId: number) => {
+  const pid = addPlaylistId.value
+  if (!pid) return
+  try {
+    await addSongToPlaylistApi(pid, songId)
+    ElMessage.success('添加成功')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '添加失败')
+  }
+}
 </script>
 
 <template>
@@ -89,8 +124,9 @@ const uploadCover = async (id: number, e: Event) => {
         <el-table-column label="封面上传">
           <template #default="{ row }"><input class="soft-input" type="file" accept="image/*" @change="uploadCover(row.id, $event)" /></template>
         </el-table-column>
-        <el-table-column label="操作" width="260">
+        <el-table-column label="操作" width="320">
           <template #default="{ row }">
+            <el-button text type="primary" @click="openAddSong(row.id)">+ 添加歌曲</el-button>
             <el-button text @click="router.push(`/playlist/${row.id}`)">详情</el-button>
             <el-button text @click="openEdit(row)">编辑</el-button>
             <el-button text type="danger" @click="remove(row.id)">删除</el-button>
@@ -104,6 +140,29 @@ const uploadCover = async (id: number, e: Event) => {
     <el-input v-model="form.name" placeholder="歌单名" />
     <el-input v-model="form.description" style="margin-top: 10px" placeholder="描述" />
     <template #footer><el-button @click="visible = false">取消</el-button><el-button type="primary" @click="submit">保存</el-button></template>
+  </el-dialog>
+
+  <el-dialog v-model="addVisible" title="添加歌曲到歌单" width="640px">
+    <el-space wrap>
+      <el-input
+        v-model="searchKey"
+        placeholder="输入歌曲名/歌手名"
+        style="width: 360px"
+        clearable
+        @keyup.enter="search"
+      />
+      <el-button type="primary" @click="search">搜索</el-button>
+    </el-space>
+    <div class="search-result-wrap">
+      <StateBlock :empty="!searchRows.length" empty-text="搜索后在此显示可添加歌曲">
+        <el-space wrap>
+          <el-button v-for="item in searchRows" :key="item.id" text @click="addSong(item.id)">+ {{ getSongTitle(item) }}</el-button>
+        </el-space>
+      </StateBlock>
+    </div>
+    <template #footer>
+      <el-button @click="addVisible = false">关闭</el-button>
+    </template>
   </el-dialog>
 </template>
 
@@ -120,5 +179,9 @@ const uploadCover = async (id: number, e: Event) => {
   border-radius: 10px;
   border: 1px solid rgba(148, 163, 184, 0.4);
   background: rgba(255, 255, 255, 0.9);
+}
+
+.search-result-wrap {
+  margin-top: 12px;
 }
 </style>

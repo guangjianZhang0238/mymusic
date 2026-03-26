@@ -116,6 +116,9 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="500px"
+      align-center
+      :lock-scroll="true"
+      class="edit-song-dialog"
     >
       <el-form
         ref="songFormRef"
@@ -222,6 +225,117 @@
       <template #footer>
         <el-button @click="manualLyricsDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitManualLyrics">保存歌词</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="autoLyricsDialogVisible"
+      title="自动匹配歌词"
+      width="980px"
+      destroy-on-close
+      align-center
+      :lock-scroll="true"
+      class="auto-lyrics-dialog"
+    >
+      <div class="auto-lyrics-search-bar">
+        <el-input
+          v-model="autoLyricsKeyword"
+          placeholder="请输入歌曲名进行搜索"
+          clearable
+          @keyup.enter="searchAutoLyricsCandidates"
+        >
+          <template #append>
+            <el-button :loading="autoLyricsSearching" @click="searchAutoLyricsCandidates">
+              搜索
+            </el-button>
+          </template>
+        </el-input>
+
+        <el-switch
+          v-model="onlyShowCandidatesWithLyrics"
+          class="only-lyrics-switch"
+          active-text="只看有歌词"
+          :disabled="autoLyricsSearching"
+        />
+      </div>
+
+      <div class="auto-lyrics-body">
+        <div class="auto-lyrics-list-panel">
+          <el-table
+            v-loading="autoLyricsSearching"
+            :data="filteredAutoLyricsCandidates"
+            border
+            style="width: 100%"
+            height="460"
+            @row-click="handleAutoLyricsRowClick"
+          >
+            <el-table-column label="选择" width="70" align="center">
+              <template #default="scope">
+                <el-radio
+                  :model-value="selectedAutoLyricsId"
+                  :label="scope.row.id"
+                  @change="selectAutoLyricsCandidate(scope.row)"
+                >
+                  &nbsp;
+                </el-radio>
+              </template>
+            </el-table-column>
+
+            <el-table-column prop="name" label="歌曲名" min-width="150" />
+
+            <el-table-column label="歌手" min-width="140">
+              <template #default="scope">
+                {{ scope.row.singerText || '-' }}
+              </template>
+            </el-table-column>
+
+            <el-table-column label="专辑" min-width="150">
+              <template #default="scope">
+                {{ scope.row.album || '-' }}
+              </template>
+            </el-table-column>
+
+            <el-table-column label="歌词情况" width="110">
+              <template #default="scope">
+                <el-tag
+                  :type="scope.row.lyricsStatus === '有歌词' ? 'success' : (scope.row.lyricsStatus === '检测中' ? 'info' : 'warning')"
+                >
+                  {{ scope.row.lyricsStatus }}
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <div class="auto-lyrics-preview">
+          <div class="auto-lyrics-preview-title">
+            歌词预览
+            <span v-if="selectedAutoLyricsMeta" class="auto-lyrics-preview-meta">
+              {{ selectedAutoLyricsMeta.name }} - {{ selectedAutoLyricsMeta.singerText || '未知歌手' }}
+            </span>
+          </div>
+
+          <el-input
+            v-model="selectedAutoLyricsContent"
+            type="textarea"
+            :rows="20"
+            readonly
+            :placeholder="selectedAutoLyricsId ? '正在加载歌词...' : '请选择一条候选歌曲查看歌词'"
+            :loading="selectedAutoLyricsLoading"
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <el-button @click="autoLyricsDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!selectedAutoLyricsId"
+          :loading="autoLyricsConfirmLoading"
+          @click="confirmAutoLyricsSelection"
+        >
+          使用该歌词
+        </el-button>
       </template>
     </el-dialog>
 
@@ -332,6 +446,25 @@ const manualLyricsForm = reactive({
   songId: 0,
   songTitle: '',
   content: ''
+})
+
+const autoLyricsDialogVisible = ref(false)
+const autoLyricsKeyword = ref('')
+const autoLyricsSearching = ref(false)
+const autoLyricsConfirmLoading = ref(false)
+const onlyShowCandidatesWithLyrics = ref(false)
+const selectedAutoLyricsId = ref<number | null>(null)
+const selectedAutoLyricsContent = ref('')
+const selectedAutoLyricsLoading = ref(false)
+const selectedAutoLyricsMeta = ref<any>(null)
+const autoLyricsContentCache = reactive<Record<number, string>>({})
+const autoLyricsCandidates = ref<any[]>([])
+
+const filteredAutoLyricsCandidates = computed(() => {
+  if (!onlyShowCandidatesWithLyrics.value) {
+    return autoLyricsCandidates.value
+  }
+  return autoLyricsCandidates.value.filter((item: any) => item.lyricsStatus === '有歌词')
 })
 
 const timingEditorVisible = ref(false)
@@ -686,17 +819,151 @@ const handleAutoMatchLyrics = async () => {
     ElMessage.error('请先保存歌曲信息，获取歌曲ID后再进行歌词匹配')
     return
   }
-  
+
+  autoLyricsDialogVisible.value = true
+  autoLyricsKeyword.value = songForm.title || ''
+  onlyShowCandidatesWithLyrics.value = false
+  selectedAutoLyricsId.value = null
+  selectedAutoLyricsMeta.value = null
+  selectedAutoLyricsContent.value = ''
+  autoLyricsCandidates.value = []
+
+  if (autoLyricsKeyword.value.trim()) {
+    await searchAutoLyricsCandidates()
+  }
+}
+
+const fetchQQMusicLyricsDetail = async (id: number) => {
+  const response = await fetch(`https://oiapi.net/api/QQMusicLyric?id=${id}`)
+  const data = await response.json()
+  if (data?.code !== 1) {
+    throw new Error(data?.message || '获取歌词详情失败')
+  }
+  const content = data?.data?.content || ''
+  return typeof content === 'string' ? content : ''
+}
+
+const searchAutoLyricsCandidates = async () => {
+  const keyword = autoLyricsKeyword.value.trim()
+  if (!keyword) {
+    ElMessage.warning('请输入歌曲名')
+    return
+  }
+
+  autoLyricsSearching.value = true
+  selectedAutoLyricsId.value = null
+  selectedAutoLyricsMeta.value = null
+  selectedAutoLyricsContent.value = ''
+  autoLyricsCandidates.value = []
+
   try {
-    const response = await songApi.autoMatchLyrics(songForm.id)
-    if (response && response.success) {
-      ElMessage.success(response.message || '歌词匹配成功')
-      songForm.hasLyrics = 1
-    } else {
-      ElMessage.warning(response.message || '未找到匹配的歌词')
+    const response = await fetch(
+      `https://oiapi.net/api/QQMusicLyric?keyword=${encodeURIComponent(keyword)}`
+    )
+    const data = await response.json()
+
+    if (data?.code !== 1) {
+      throw new Error(data?.message || '搜索歌词失败')
+    }
+
+    const list = Array.isArray(data?.data) ? data.data : []
+    autoLyricsCandidates.value = list.map((item: any) => ({
+      ...item,
+      singerText: Array.isArray(item?.singer) ? item.singer.join(' / ') : '',
+      lyricsStatus: '检测中'
+    }))
+
+    await Promise.all(
+      autoLyricsCandidates.value.map(async (item: any) => {
+        try {
+          const content = await fetchQQMusicLyricsDetail(item.id)
+          if (content) {
+            autoLyricsContentCache[item.id] = content
+          }
+          item.lyricsStatus = content ? '有歌词' : '无歌词'
+        } catch {
+          item.lyricsStatus = '无歌词'
+        }
+      })
+    )
+
+    if (!autoLyricsCandidates.value.length) {
+      ElMessage.warning('未搜索到匹配歌曲')
     }
   } catch (error: any) {
-    ElMessage.error(error.message || '歌词匹配失败')
+    ElMessage.error(error?.message || '搜索歌词失败')
+  } finally {
+    autoLyricsSearching.value = false
+  }
+}
+
+const selectAutoLyricsCandidate = async (row: any) => {
+  if (!row?.id) return
+  if (selectedAutoLyricsId.value === row.id && selectedAutoLyricsContent.value) return
+
+  selectedAutoLyricsId.value = row.id
+  selectedAutoLyricsMeta.value = row
+  selectedAutoLyricsContent.value = ''
+  selectedAutoLyricsLoading.value = true
+
+  try {
+    if (!autoLyricsContentCache[row.id]) {
+      autoLyricsContentCache[row.id] = await fetchQQMusicLyricsDetail(row.id)
+    }
+    selectedAutoLyricsContent.value = autoLyricsContentCache[row.id] || ''
+    if (!selectedAutoLyricsContent.value) {
+      ElMessage.warning('该歌曲未获取到有效歌词')
+    }
+  } catch (error: any) {
+    selectedAutoLyricsContent.value = ''
+    ElMessage.error(error?.message || '加载歌词失败')
+  } finally {
+    selectedAutoLyricsLoading.value = false
+  }
+}
+
+const handleAutoLyricsRowClick = (row: any) => {
+  selectAutoLyricsCandidate(row)
+}
+
+const confirmAutoLyricsSelection = async () => {
+  if (!songForm.id) {
+    ElMessage.error('歌曲ID无效，请先保存歌曲')
+    return
+  }
+  if (!selectedAutoLyricsId.value) {
+    ElMessage.warning('请选择要使用的歌词')
+    return
+  }
+
+  autoLyricsConfirmLoading.value = true
+  try {
+    if (!selectedAutoLyricsContent.value.trim()) {
+      selectedAutoLyricsContent.value =
+        autoLyricsContentCache[selectedAutoLyricsId.value] ||
+        (await fetchQQMusicLyricsDetail(selectedAutoLyricsId.value))
+    }
+
+    if (!selectedAutoLyricsContent.value.trim()) {
+      ElMessage.warning('选中的歌词内容为空，无法保存')
+      return
+    }
+
+    await request.post('/lyrics', {
+      songId: songForm.id,
+      content: selectedAutoLyricsContent.value,
+      lyricsType: 1,
+      source: 'QQMusic自动匹配'
+    })
+
+    songForm.hasLyrics = 1
+    autoLyricsDialogVisible.value = false
+    ElMessage.success('歌词替换成功')
+    loadSongs()
+  } catch (error: any) {
+    ElMessage.error(error?.message || '歌词保存失败')
+  } finally {
+    autoLyricsConfirmLoading.value = false
   }
 }
 
@@ -824,5 +1091,66 @@ onMounted(() => {
 
 .action-buttons-row :deep(.el-upload) {
   display: inline-flex;
+}
+
+:deep(.edit-song-dialog .el-dialog),
+:deep(.auto-lyrics-dialog .el-dialog) {
+  margin: 0 !important;
+}
+
+:deep(.edit-song-dialog .el-dialog__body) {
+  max-height: 68vh;
+  overflow-y: auto;
+}
+
+:deep(.auto-lyrics-dialog .el-dialog__body) {
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.auto-lyrics-search-bar {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auto-lyrics-search-bar :deep(.el-input) {
+  flex: 1;
+}
+
+.only-lyrics-switch {
+  flex-shrink: 0;
+}
+
+.auto-lyrics-body {
+  margin-top: 12px;
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.auto-lyrics-list-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.auto-lyrics-preview {
+  width: 42%;
+  min-width: 320px;
+}
+
+.auto-lyrics-preview-title {
+  font-size: 14px;
+  color: #303133;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.auto-lyrics-preview-meta {
+  color: #909399;
+  font-size: 12px;
 }
 </style>

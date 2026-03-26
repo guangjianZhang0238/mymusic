@@ -31,7 +31,11 @@ service.interceptors.response.use(
   (response: AxiosResponse<ApiResult<any>>) => {
     const res = response.data
     if (res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
+      // 用户未登录属于“可选能力”场景（如播放器效果器设置/收藏状态），
+      // 不应该在全局弹窗打断播放体验。
+      if (res.message !== '用户未登录') {
+        ElMessage.error(res.message || '请求失败')
+      }
       return Promise.reject(new Error(res.message || 'Request failed'))
     }
     return res.data

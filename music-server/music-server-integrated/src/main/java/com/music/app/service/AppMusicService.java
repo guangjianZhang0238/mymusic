@@ -14,6 +14,12 @@ public interface AppMusicService {
 
     List<AppSongVO> hotSongs();
 
+    /**
+     * 获取热门歌手（按“歌手参与歌曲数 songCount”口径排序）
+     * @param limit 返回数量上限
+     */
+    List<AppArtistVO> hotArtists(int limit);
+
     Page<AppAlbumVO> pageAlbums(Integer current, Integer size, String keyword, Long artistId);
 
     Page<AppArtistVO> pageArtists(Integer current, Integer size, String keyword);
