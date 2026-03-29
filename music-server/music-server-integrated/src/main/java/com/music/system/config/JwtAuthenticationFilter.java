@@ -34,9 +34,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         AppUserPrincipal principal = new AppUserPrincipal(userId, username);
                         UsernamePasswordAuthenticationToken authentication =
                                 new UsernamePasswordAuthenticationToken(principal, null, AuthorityUtils.NO_AUTHORITIES);
-                        // 某些情况下即使 token 校验通过，若 authorities 为空可能导致 isAuthenticated=false
-                        // 显式标记为已认证，确保 SecurityUtils.getUserId() 能拿到 userId。
-                        authentication.setAuthenticated(true);
+                        // 通过该构造器创建的认证对象已是 authenticated=true，
+                        // 不需要再手动 setAuthenticated(true)，否则会触发 IllegalArgumentException。
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                     }
                 }

@@ -2,10 +2,8 @@ package com.music.app.controller;
 
 import com.music.app.vo.AppPlaylistVO;
 import com.music.common.core.domain.Result;
-import com.music.common.core.domain.PageResult;
 import com.music.common.utils.SecurityUtils;
 import com.music.player.dto.PlaylistDTO;
-import com.music.player.dto.PlaylistQueryDTO;
 import com.music.player.service.PlaylistService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -120,6 +118,14 @@ public class AppPlaylistController {
     public Result<Void> removeSongFromPlaylist(@PathVariable Long playlistId, @PathVariable Long songId) {
         log.info("访问接口：开始从播放列表移除歌曲，播放列表ID: {}, 歌曲ID: {}", playlistId, songId);
         playlistService.removeSongFromPlaylist(playlistId, songId);
+        return Result.success();
+    }
+
+    @Operation(summary = "清空播放列表中的歌曲")
+    @DeleteMapping("/{playlistId}/songs")
+    public Result<Void> clearPlaylistSongs(@PathVariable Long playlistId) {
+        log.info("访问接口：开始清空播放列表中的歌曲，播放列表ID: {}", playlistId);
+        playlistService.clearPlaylistSongs(playlistId);
         return Result.success();
     }
 

@@ -7,6 +7,7 @@ import { getLyricsApi } from '@/api/music'
 import { getCommentsApi, addCommentApi, likeCommentApi, unlikeCommentApi, deleteCommentApi, createFeedbackApi } from '@/api/social'
 import { getUserSettingsApi, saveUserSettingApi } from '@/api/settings'
 import { playerAudio } from '@/utils/playerAudio'
+import { USER_SETTINGS_UPDATED_EVENT } from '@/utils/settingsSync'
 import { normalizeLyrics } from '@/utils/lyrics'
 import StateBlock from '@/components/StateBlock.vue'
 import { ElMessage } from 'element-plus'
@@ -364,8 +365,10 @@ let pendingResumeTime = 0
 // When the song ends naturally and we auto-advance, we don't want that pause
 // to flip UI state to "paused" and prevent the next track from auto-playing.
 let ignoreNextPause = false
+const userPreferredAutoPlayOnOpen = ref<boolean | null>(null)
 const shouldAutoplayOnInit = () => {
   if (isReloadNavigation()) return shouldResumeAfterReload
+  if (userPreferredAutoPlayOnOpen.value !== null) return userPreferredAutoPlayOnOpen.value
   // 非刷新场景下，仅在原本就是播放态时继续自动播放，避免“暂停后进入播放器又自动播放”
   return !!store.playing
 }
@@ -415,6 +418,9 @@ const onBeforeUnload = () => {
 const gainDb = ref(0)
 const attenuateDb = ref(0)
 const detailTab = ref<'lyrics' | 'comments'>('lyrics')
+const lyricsRefreshing = ref(false)
+const lyricFontSize = ref(18)
+const lyricAutoScroll = ref(true)
 const comments = ref<any[]>([])
 const commentsLoading = ref(false)
 const commentsError = ref('')
@@ -1113,115 +1119,278 @@ const loadComments = async (targetSongId = songId.value) => {
   }
 }
 
+const EFFECT_SETTINGS_KEY = 'player.equalizer.config'
+const EFFECT_SETTINGS_STORAGE_PREFIX = `music-web:${EFFECT_SETTINGS_KEY}:`
+
+type EffectSettingsPayload = ReturnType<typeof buildEffectSettingsPayload>
+type EffectSettingsRecord = {
+  version: number
+  updatedAt: number
+  payload: EffectSettingsPayload
+}
+
+const getEffectSettingsStorageKey = () => {
+  const info = (user.userInfo || {}) as any
+  const uid = info?.id || info?.userId || info?.username || info?.email || 'guest'
+  return `${EFFECT_SETTINGS_STORAGE_PREFIX}${String(uid)}`
+}
+
+const buildEffectSettingsPayload = () => ({
+  eqPreset: eqPreset.value,
+  advancedFxPreset: advancedFxPreset.value,
+  advancedConfigEnabled: advancedConfigEnabled.value,
+  eqGains: [...eqGains.value],
+  pitchSemitone: pitchSemitone.value,
+  gainDb: gainDb.value,
+  attenuateDb: attenuateDb.value,
+  compressorEnabled: compressorEnabled.value,
+  compressorThreshold: compressorThreshold.value,
+  compressorRatio: compressorRatio.value,
+  compressorAttack: compressorAttack.value,
+  compressorRelease: compressorRelease.value,
+  reverbEnabled: reverbEnabled.value,
+  reverbType: reverbType.value,
+  reverbRoomSize: reverbRoomSize.value,
+  reverbDecay: reverbDecay.value,
+  reverbWet: reverbWet.value,
+  spatialEnabled: spatialEnabled.value,
+  spatialDepth: spatialDepth.value,
+  spatialWidth: spatialWidth.value,
+  channelBalance: channelBalance.value,
+  leftGainDb: leftGainDb.value,
+  rightGainDb: rightGainDb.value,
+  phaseInvertLeft: phaseInvertLeft.value,
+  phaseInvertRight: phaseInvertRight.value,
+  monoMerge: monoMerge.value,
+  leftDelayMs: leftDelayMs.value,
+  rightDelayMs: rightDelayMs.value
+})
+
+const normalizeEffectSettingsRecord = (input: unknown): EffectSettingsRecord | null => {
+  if (!input || typeof input !== 'object') return null
+  const raw = input as any
+  const payload = raw?.payload && typeof raw.payload === 'object' ? raw.payload : raw
+  if (!payload || typeof payload !== 'object') return null
+
+  const v = Number(raw?.version)
+  const t = Number(raw?.updatedAt)
+  return {
+    version: Number.isFinite(v) && v > 0 ? Math.floor(v) : 1,
+    updatedAt: Number.isFinite(t) && t > 0 ? Math.floor(t) : Date.now(),
+    payload: payload as EffectSettingsPayload
+  }
+}
+
+const readLocalEffectSettingsRecord = (): EffectSettingsRecord | null => {
+  try {
+    const raw = window.localStorage.getItem(getEffectSettingsStorageKey())
+    if (!raw) return null
+    return normalizeEffectSettingsRecord(JSON.parse(raw))
+  } catch {
+    return null
+  }
+}
+
+const writeLocalEffectSettingsRecord = (record: EffectSettingsRecord) => {
+  try {
+    window.localStorage.setItem(getEffectSettingsStorageKey(), JSON.stringify(record))
+  } catch {
+    // ignore local persistence errors
+  }
+}
+
+const pickNewerEffectSettingsRecord = (
+  a: EffectSettingsRecord | null,
+  b: EffectSettingsRecord | null
+): EffectSettingsRecord | null => {
+  if (!a) return b
+  if (!b) return a
+  if (a.version !== b.version) return a.version > b.version ? a : b
+  if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? a : b
+  return a
+}
+
+const applyEffectSettings = (parsed: any) => {
+  isApplyingAdvancedFxPreset.value = true
+  try {
+    if (Array.isArray(parsed?.eqGains) && parsed.eqGains.length === EQ_FREQUENCIES.length) {
+      eqGains.value = parsed.eqGains.map((n: unknown) => Number(n) || 0)
+      applyEqGains()
+    }
+    if (typeof parsed?.eqPreset === 'string') eqPreset.value = parsed.eqPreset
+    if (typeof parsed?.advancedFxPreset === 'string') advancedFxPreset.value = parsed.advancedFxPreset
+    if (typeof parsed?.advancedConfigEnabled === 'boolean') advancedConfigEnabled.value = parsed.advancedConfigEnabled
+    if (Number.isFinite(Number(parsed?.pitchSemitone))) pitchSemitone.value = Number(parsed.pitchSemitone)
+    if (Number.isFinite(Number(parsed?.gainDb))) gainDb.value = Number(parsed.gainDb)
+    if (Number.isFinite(Number(parsed?.attenuateDb))) attenuateDb.value = Number(parsed.attenuateDb)
+    if (typeof parsed?.compressorEnabled === 'boolean') compressorEnabled.value = parsed.compressorEnabled
+    if (Number.isFinite(Number(parsed?.compressorThreshold))) compressorThreshold.value = Number(parsed.compressorThreshold)
+    if (Number.isFinite(Number(parsed?.compressorRatio))) compressorRatio.value = Number(parsed.compressorRatio)
+    if (Number.isFinite(Number(parsed?.compressorAttack))) compressorAttack.value = Number(parsed.compressorAttack)
+    if (Number.isFinite(Number(parsed?.compressorRelease))) compressorRelease.value = Number(parsed.compressorRelease)
+    if (typeof parsed?.reverbEnabled === 'boolean') reverbEnabled.value = parsed.reverbEnabled
+    if (['room', 'hall', 'canyon'].includes(parsed?.reverbType)) reverbType.value = parsed.reverbType
+    if (Number.isFinite(Number(parsed?.reverbRoomSize))) reverbRoomSize.value = Number(parsed.reverbRoomSize)
+    if (Number.isFinite(Number(parsed?.reverbDecay))) reverbDecay.value = Number(parsed.reverbDecay)
+    if (Number.isFinite(Number(parsed?.reverbWet))) reverbWet.value = Number(parsed.reverbWet)
+    if (typeof parsed?.spatialEnabled === 'boolean') spatialEnabled.value = parsed.spatialEnabled
+    if (Number.isFinite(Number(parsed?.spatialDepth))) spatialDepth.value = Number(parsed.spatialDepth)
+    if (Number.isFinite(Number(parsed?.spatialWidth))) spatialWidth.value = Number(parsed.spatialWidth)
+    if (Number.isFinite(Number(parsed?.channelBalance))) channelBalance.value = Number(parsed.channelBalance)
+    if (Number.isFinite(Number(parsed?.leftGainDb))) leftGainDb.value = Number(parsed.leftGainDb)
+    if (Number.isFinite(Number(parsed?.rightGainDb))) rightGainDb.value = Number(parsed.rightGainDb)
+    if (typeof parsed?.phaseInvertLeft === 'boolean') phaseInvertLeft.value = parsed.phaseInvertLeft
+    if (typeof parsed?.phaseInvertRight === 'boolean') phaseInvertRight.value = parsed.phaseInvertRight
+    if (typeof parsed?.monoMerge === 'boolean') monoMerge.value = parsed.monoMerge
+    if (Number.isFinite(Number(parsed?.leftDelayMs))) leftDelayMs.value = Number(parsed.leftDelayMs)
+    if (Number.isFinite(Number(parsed?.rightDelayMs))) rightDelayMs.value = Number(parsed.rightDelayMs)
+    applyPitch()
+    applyMasterGain()
+    applyCompressorSettings()
+    applyReverbSettings()
+    applySpatialSettings()
+    applyChannelSettings()
+  } finally {
+    isApplyingAdvancedFxPreset.value = false
+  }
+}
+
 const persistEffectSettings = () => {
   if (persistTimer) window.clearTimeout(persistTimer)
   persistTimer = window.setTimeout(async () => {
+    const now = Date.now()
+    const localCurrent = readLocalEffectSettingsRecord()
+    const nextRecord: EffectSettingsRecord = {
+      version: Math.max(1, (localCurrent?.version || 0) + 1),
+      updatedAt: Math.max(now, (localCurrent?.updatedAt || 0) + 1),
+      payload: buildEffectSettingsPayload()
+    }
+
+    writeLocalEffectSettingsRecord(nextRecord)
+
+    if (!user.isLoggedIn) return
+
     try {
-      await saveUserSettingApi(
-        'player.equalizer.config',
-        JSON.stringify({
-          eqPreset: eqPreset.value,
-          advancedFxPreset: advancedFxPreset.value,
-          advancedConfigEnabled: advancedConfigEnabled.value,
-          eqGains: eqGains.value,
-          pitchSemitone: pitchSemitone.value,
-          gainDb: gainDb.value,
-          attenuateDb: attenuateDb.value,
-          compressorEnabled: compressorEnabled.value,
-          compressorThreshold: compressorThreshold.value,
-          compressorRatio: compressorRatio.value,
-          compressorAttack: compressorAttack.value,
-          compressorRelease: compressorRelease.value,
-          reverbEnabled: reverbEnabled.value,
-          reverbType: reverbType.value,
-          reverbRoomSize: reverbRoomSize.value,
-          reverbDecay: reverbDecay.value,
-          reverbWet: reverbWet.value,
-          spatialEnabled: spatialEnabled.value,
-          spatialDepth: spatialDepth.value,
-          spatialWidth: spatialWidth.value,
-          channelBalance: channelBalance.value,
-          leftGainDb: leftGainDb.value,
-          rightGainDb: rightGainDb.value,
-          phaseInvertLeft: phaseInvertLeft.value,
-          phaseInvertRight: phaseInvertRight.value,
-          monoMerge: monoMerge.value,
-          leftDelayMs: leftDelayMs.value,
-          rightDelayMs: rightDelayMs.value
-        }),
-        'json',
-        '播放器效果器设置'
-      )
+      await saveUserSettingApi(EFFECT_SETTINGS_KEY, JSON.stringify(nextRecord), 'json', '播放器效果器设置')
     } catch {
-      // ignore persistence errors for smoother UX
+      // ignore remote persistence errors for smoother UX
     }
   }, 400)
 }
 
 const loadEffectSettings = async () => {
-  try {
-    const settings = await getUserSettingsApi()
-    const row = (settings || []).find((item: any) => item.settingKey === 'player.equalizer.config')
-    if (!row?.settingValue) return
-    const parsed = JSON.parse(row.settingValue)
-    isApplyingAdvancedFxPreset.value = true
+  const localRecord = readLocalEffectSettingsRecord()
+  let remoteRecord: EffectSettingsRecord | null = null
+
+  if (user.isLoggedIn) {
     try {
-      if (Array.isArray(parsed.eqGains) && parsed.eqGains.length === EQ_FREQUENCIES.length) {
-        eqGains.value = parsed.eqGains.map((n: unknown) => Number(n) || 0)
-        applyEqGains()
+      const settings = await getUserSettingsApi()
+      const row = (settings || []).find((item: any) => item.settingKey === EFFECT_SETTINGS_KEY)
+      if (row?.settingValue) {
+        remoteRecord = normalizeEffectSettingsRecord(JSON.parse(row.settingValue))
       }
-      if (typeof parsed.eqPreset === 'string') eqPreset.value = parsed.eqPreset
-      if (typeof parsed.advancedFxPreset === 'string') advancedFxPreset.value = parsed.advancedFxPreset
-      if (typeof parsed.advancedConfigEnabled === 'boolean') advancedConfigEnabled.value = parsed.advancedConfigEnabled
-      if (Number.isFinite(Number(parsed.pitchSemitone))) pitchSemitone.value = Number(parsed.pitchSemitone)
-      if (Number.isFinite(Number(parsed.gainDb))) gainDb.value = Number(parsed.gainDb)
-      if (Number.isFinite(Number(parsed.attenuateDb))) attenuateDb.value = Number(parsed.attenuateDb)
-      if (typeof parsed.compressorEnabled === 'boolean') compressorEnabled.value = parsed.compressorEnabled
-      if (Number.isFinite(Number(parsed.compressorThreshold))) compressorThreshold.value = Number(parsed.compressorThreshold)
-      if (Number.isFinite(Number(parsed.compressorRatio))) compressorRatio.value = Number(parsed.compressorRatio)
-      if (Number.isFinite(Number(parsed.compressorAttack))) compressorAttack.value = Number(parsed.compressorAttack)
-      if (Number.isFinite(Number(parsed.compressorRelease))) compressorRelease.value = Number(parsed.compressorRelease)
-      if (typeof parsed.reverbEnabled === 'boolean') reverbEnabled.value = parsed.reverbEnabled
-      if (['room', 'hall', 'canyon'].includes(parsed.reverbType)) reverbType.value = parsed.reverbType
-      if (Number.isFinite(Number(parsed.reverbRoomSize))) reverbRoomSize.value = Number(parsed.reverbRoomSize)
-      if (Number.isFinite(Number(parsed.reverbDecay))) reverbDecay.value = Number(parsed.reverbDecay)
-      if (Number.isFinite(Number(parsed.reverbWet))) reverbWet.value = Number(parsed.reverbWet)
-      if (typeof parsed.spatialEnabled === 'boolean') spatialEnabled.value = parsed.spatialEnabled
-      if (Number.isFinite(Number(parsed.spatialDepth))) spatialDepth.value = Number(parsed.spatialDepth)
-      if (Number.isFinite(Number(parsed.spatialWidth))) spatialWidth.value = Number(parsed.spatialWidth)
-      if (Number.isFinite(Number(parsed.channelBalance))) channelBalance.value = Number(parsed.channelBalance)
-      if (Number.isFinite(Number(parsed.leftGainDb))) leftGainDb.value = Number(parsed.leftGainDb)
-      if (Number.isFinite(Number(parsed.rightGainDb))) rightGainDb.value = Number(parsed.rightGainDb)
-      if (typeof parsed.phaseInvertLeft === 'boolean') phaseInvertLeft.value = parsed.phaseInvertLeft
-      if (typeof parsed.phaseInvertRight === 'boolean') phaseInvertRight.value = parsed.phaseInvertRight
-      if (typeof parsed.monoMerge === 'boolean') monoMerge.value = parsed.monoMerge
-      if (Number.isFinite(Number(parsed.leftDelayMs))) leftDelayMs.value = Number(parsed.leftDelayMs)
-      if (Number.isFinite(Number(parsed.rightDelayMs))) rightDelayMs.value = Number(parsed.rightDelayMs)
-      applyPitch()
-      applyMasterGain()
-      applyCompressorSettings()
-      applyReverbSettings()
-      applySpatialSettings()
-      applyChannelSettings()
-    } finally {
-      isApplyingAdvancedFxPreset.value = false
+    } catch {
+      // ignore network/parse errors, fallback to local record
     }
+  }
+
+  const winner = pickNewerEffectSettingsRecord(remoteRecord, localRecord)
+  if (!winner) return
+
+  applyEffectSettings(winner.payload)
+  writeLocalEffectSettingsRecord(winner)
+
+  if (user.isLoggedIn && winner === localRecord) {
+    try {
+      await saveUserSettingApi(EFFECT_SETTINGS_KEY, JSON.stringify(winner), 'json', '播放器效果器设置')
+    } catch {
+      // ignore sync-back errors
+    }
+  }
+}
+
+const applySimpleUserSettings = (rows: Array<{ settingKey?: string; settingValue?: string }>) => {
+  const map = new Map<string, string>()
+  ;(rows || []).forEach((item) => {
+    const key = String(item?.settingKey || '').trim()
+    if (!key) return
+    map.set(key, String(item?.settingValue ?? '').trim())
+  })
+
+  if (map.has('player.volume')) {
+    const volumeRaw = Number(map.get('player.volume') || '70')
+    const volumePercent = clamp(Number.isFinite(volumeRaw) ? volumeRaw : 70, 0, 100)
+    audio.volume = volumePercent / 100
+  }
+
+  if (map.has('player.playMode')) {
+    const playModeRaw = String(map.get('player.playMode') || 'loop')
+    const validMode = ['random', 'order', 'loop', 'single'].includes(playModeRaw) ? (playModeRaw as PlayMode) : 'loop'
+    store.setPlayMode(validMode)
+  }
+
+  if (map.has('player.autoPlayOnOpen')) {
+    const autoPlayRaw = String(map.get('player.autoPlayOnOpen') || 'true').toLowerCase()
+    userPreferredAutoPlayOnOpen.value = autoPlayRaw === 'true'
+  }
+
+  if (map.has('lyrics.autoScroll')) {
+    const lyricAutoRaw = String(map.get('lyrics.autoScroll') || 'true').toLowerCase()
+    lyricAutoScroll.value = lyricAutoRaw === 'true'
+  }
+
+  if (map.has('lyrics.fontSize')) {
+    const lyricFontRaw = Number(map.get('lyrics.fontSize') || '18')
+    lyricFontSize.value = clamp(Number.isFinite(lyricFontRaw) ? lyricFontRaw : 18, 12, 34)
+  }
+}
+
+const getDefaultSimpleUserSettingsRows = () => [
+  { settingKey: 'player.volume', settingValue: '70' },
+  { settingKey: 'player.playMode', settingValue: 'loop' },
+  { settingKey: 'player.autoPlayOnOpen', settingValue: 'true' },
+  { settingKey: 'lyrics.autoScroll', settingValue: 'true' },
+  { settingKey: 'lyrics.fontSize', settingValue: '18' }
+]
+
+const loadSimpleUserSettings = async () => {
+  try {
+    const rows = await getUserSettingsApi()
+    const mergedRows = [...getDefaultSimpleUserSettingsRows(), ...(rows as any[])]
+    applySimpleUserSettings(mergedRows)
   } catch {
-    // ignore parse/network errors
+    // 使用默认配置兜底，避免影响播放体验
+    applySimpleUserSettings(getDefaultSimpleUserSettingsRows())
   }
 }
 
 const loadLyrics = async (targetSongId = songId.value) => {
   if (!targetSongId) {
     lyrics.value = []
+    activeLyric.value = -1
     return
   }
   try {
     const data = await getLyricsApi(targetSongId)
     lyrics.value = normalizeLyrics(data?.lines || [])
+    updateActiveLyric((store.currentTime || 0) * 1000)
   } catch (e: any) {
     ElMessage.warning(e?.message || '歌词加载失败')
     lyrics.value = []
+    activeLyric.value = -1
+  }
+}
+
+const refreshLyrics = async () => {
+  if (!songId.value || lyricsRefreshing.value) return
+  lyricsRefreshing.value = true
+  try {
+    await loadLyrics(songId.value)
+    ElMessage.success('歌词已刷新')
+  } catch {
+    // loadLyrics 已处理提示
+  } finally {
+    lyricsRefreshing.value = false
   }
 }
 
@@ -1264,6 +1433,7 @@ onMounted(async () => {
   window.addEventListener('resize', onWindowResize)
   window.addEventListener('pointermove', onSpatialPointerMove)
   window.addEventListener('pointerup', stopSpatialDragging)
+  window.addEventListener(USER_SETTINGS_UPDATED_EVENT, onUserSettingsUpdated as EventListener)
 
   loading.value = true
   error.value = ''
@@ -1278,10 +1448,8 @@ onMounted(async () => {
     }
 
     await loadSongDetails(songId.value || store.currentSongId || 0)
-    // 未登录时播放器效果器配置无需拉取，避免触发后端“用户未登录”提示
-    if (user.isLoggedIn) {
-      void loadEffectSettings()
-    }
+    await loadSimpleUserSettings()
+    void loadEffectSettings()
   } catch (e: any) {
     error.value = e?.message || '播放器初始化失败'
   } finally {
@@ -1360,6 +1528,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onWindowResize)
   window.removeEventListener('pointermove', onSpatialPointerMove)
   window.removeEventListener('pointerup', stopSpatialDragging)
+  window.removeEventListener(USER_SETTINGS_UPDATED_EVENT, onUserSettingsUpdated as EventListener)
   if (seekReleaseTimer) window.clearTimeout(seekReleaseTimer)
   if (persistTimer) window.clearTimeout(persistTimer)
   if (spectrumStartRetryTimer) window.clearTimeout(spectrumStartRetryTimer)
@@ -1742,7 +1911,19 @@ const submitFeedback = async () => {
 
 const playFromQueue = async (id: number) => {
   if (!id) return
+  const isCurrentSong = Number(id) === Number(store.currentSongId)
   await store.playBySongId(id)
+  // Clicking the current queue row does not change songId, so src watcher won't run.
+  // Explicitly resume the shared audio element to avoid "UI playing but no sound".
+  if (isCurrentSong && audio.paused) {
+    try {
+      await ensureAudioContext()
+      await audio.play()
+      store.playing = true
+    } catch {
+      store.playing = false
+    }
+  }
 }
 
 const removeQueueSong = async (id: number) => {
@@ -1779,9 +1960,17 @@ const queueRowClassName = ({ row }: any) => {
   return store.playing ? 'queue-current-row queue-current-playing' : 'queue-current-row'
 }
 
+const onUserSettingsUpdated = (event: Event) => {
+  const customEvent = event as CustomEvent<{ items?: Array<{ settingKey?: string; settingValue?: string }> }>
+  const items = customEvent?.detail?.items || []
+  if (!items.length) return
+  applySimpleUserSettings(items)
+}
+
 watch(
   () => activeLyric.value,
   () => {
+    if (!lyricAutoScroll.value) return
     if (detailTab.value !== 'lyrics') return
     if (!lyricScrollRef.value || activeLyric.value < 0) return
     const activeEl = lyricScrollRef.value.querySelector('.lyric-line.is-active') as HTMLElement | null
@@ -1871,7 +2060,22 @@ watch(
 
         <el-card class="glow-card lyric-detail-card">
           <template #header>
-            {{ detailTab === 'lyrics' ? '歌词详情' : `歌曲评论（${comments.length}）` }}
+            <div class="lyric-detail-header">
+              <span>{{ detailTab === 'lyrics' ? '歌词详情' : `歌曲评论（${comments.length}）` }}</span>
+              <el-tooltip v-if="detailTab === 'lyrics'" content="刷新歌词" placement="top">
+                <el-button
+                  class="lyric-refresh-btn"
+                  circle
+                  text
+                  :loading="lyricsRefreshing"
+                  :disabled="!songId"
+                  aria-label="刷新歌词"
+                  @click="refreshLyrics"
+                >
+                  ⟳
+                </el-button>
+              </el-tooltip>
+            </div>
           </template>
           <template v-if="detailTab === 'lyrics'">
             <StateBlock :empty="!lyrics.length" empty-text="暂无歌词">
@@ -1880,6 +2084,7 @@ watch(
                   v-for="(line, index) in lyrics"
                   :key="index"
                   class="lyric-line"
+                  :style="{ fontSize: `${lyricFontSize}px` }"
                   :class="{ 'is-active': index === activeLyric, 'is-playing': index === activeLyric && store.playing }"
                 >
                   <span class="lyric-text">{{ line.text }}</span>
@@ -2687,6 +2892,23 @@ watch(
   min-height: 56px;
   display: flex;
   align-items: center;
+}
+
+.lyric-detail-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lyric-refresh-btn {
+  font-size: 16px;
+  color: #64748b;
+}
+
+.lyric-refresh-btn:hover {
+  color: #0ea5e9;
 }
 
 .queue-header {

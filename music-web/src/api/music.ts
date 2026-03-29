@@ -1,7 +1,7 @@
 import request from './request'
 import type { Artist, PageResult, Playlist, Song } from './types'
 
-export const getHotSongsApi = () => request.get<Song[]>('/app/music/song/hot')
+export const getHotSongsApi = (limit?: number) => request.get<Song[]>('/app/music/song/hot', { params: { limit } })
 export const getPersonalRecommendApi = (limit = 10) => request.get<Song[]>('/web/recommend/personal', { params: { limit } })
 export const getDailyRecommendApi = (limit = 10) => request.get<Song[]>('/web/recommend/daily', { params: { limit } })
 export const getSceneRecommendApi = (limit = 10) => request.get<Song[]>('/web/recommend/scene', { params: { limit } })
@@ -39,6 +39,7 @@ export const addSongToPlaylistApi = (playlistId: number, songId: number) =>
   request.post<void>(`/app/music/playlist/${playlistId}/song/${songId}`)
 export const removeSongFromPlaylistApi = (playlistId: number, songId: number) =>
   request.delete<void>(`/app/music/playlist/${playlistId}/song/${songId}`)
+export const clearPlaylistSongsApi = (playlistId: number) => request.delete<void>(`/app/music/playlist/${playlistId}/songs`)
 
 export const uploadAvatarApi = (file: File) => {
   const data = new FormData()

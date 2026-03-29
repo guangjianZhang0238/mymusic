@@ -59,6 +59,11 @@ public interface PlaylistService extends IService<Playlist> {
     void removeSongFromPlaylist(Long playlistId, Long songId);
 
     /**
+     * 清空播放列表中的歌曲
+     */
+    void clearPlaylistSongs(Long playlistId);
+
+    /**
      * 获取播放列表中的歌曲
      */
     List<Long> getPlaylistSongs(Long playlistId);

@@ -55,7 +55,21 @@ public class JwtUtils {
     
     public Long getUserId(String token) {
         Claims claims = parseToken(token);
-        return claims.get("userId", Long.class);
+        Object rawUserId = claims.get("userId");
+        if (rawUserId == null) {
+            return null;
+        }
+        if (rawUserId instanceof Number number) {
+            return number.longValue();
+        }
+        if (rawUserId instanceof String str && !str.isBlank()) {
+            try {
+                return Long.parseLong(str.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
     
     public String getUsername(String token) {

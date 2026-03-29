@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { getLyricsApi, getSongsByIdsApi } from '@/api/music'
+import { getUserSettingsApi } from '@/api/settings'
+import { USER_SETTINGS_UPDATED_EVENT } from '@/utils/settingsSync'
 import { normalizeLyrics } from '@/utils/lyrics'
 import StateBlock from '@/components/StateBlock.vue'
 import { getDisplaySongTitle } from '@/utils/songTitle'
@@ -13,12 +15,41 @@ const artist = ref('')
 const lines = ref<any[]>([])
 const loading = ref(false)
 const error = ref('')
+const lyricFontSize = ref(18)
+
+const lyricLineStyle = computed(() => ({
+  fontSize: `${lyricFontSize.value}px`
+}))
+
+const applyLyricFontSizeSetting = (value: unknown) => {
+  const raw = Number(value)
+  lyricFontSize.value = Math.max(12, Math.min(34, Number.isFinite(raw) ? raw : 18))
+}
+
+const loadLyricUserSettings = async () => {
+  try {
+    const settings = await getUserSettingsApi()
+    const row = (settings || []).find((item: any) => item.settingKey === 'lyrics.fontSize')
+    applyLyricFontSizeSetting(row?.settingValue ?? 18)
+  } catch {
+    applyLyricFontSizeSetting(18)
+  }
+}
+
+const onUserSettingsUpdated = (event: Event) => {
+  const customEvent = event as CustomEvent<{ items?: Array<{ settingKey?: string; settingValue?: string }> }>
+  const items = customEvent?.detail?.items || []
+  const matched = items.find((item) => item?.settingKey === 'lyrics.fontSize')
+  if (!matched) return
+  applyLyricFontSizeSetting(matched.settingValue)
+}
 
 onMounted(async () => {
+  window.addEventListener(USER_SETTINGS_UPDATED_EVENT, onUserSettingsUpdated as EventListener)
   loading.value = true
   error.value = ''
   try {
-    const [songRows, lyric] = await Promise.all([getSongsByIdsApi([songId]), getLyricsApi(songId)])
+    const [songRows, lyric] = await Promise.all([getSongsByIdsApi([songId]), getLyricsApi(songId), loadLyricUserSettings()])
     const song = songRows[0]
     title.value = song ? getDisplaySongTitle(song) : ''
     artist.value = song?.artistName || song?.artistNames || ''
@@ -29,6 +60,10 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+onBeforeUnmount(() => {
+  window.removeEventListener(USER_SETTINGS_UPDATED_EVENT, onUserSettingsUpdated as EventListener)
+})
 </script>
 
 <template>
@@ -37,7 +72,7 @@ onMounted(async () => {
   <StateBlock :loading="loading" :error="error" :empty="!lines.length" empty-text="暂无歌词">
     <el-card class="glow-card">
       <div class="lyric-wrap">
-        <p v-for="(line, idx) in lines" :key="idx" class="lyric-line">{{ line }}</p>
+        <p v-for="(line, idx) in lines" :key="idx" class="lyric-line" :style="lyricLineStyle">{{ line }}</p>
       </div>
     </el-card>
   </StateBlock>

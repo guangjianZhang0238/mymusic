@@ -15,11 +15,13 @@ import com.music.common.utils.FileUtils;
 import com.music.content.entity.Album;
 import com.music.content.entity.Artist;
 import com.music.content.entity.AlbumSong;
+import com.music.content.entity.Lyrics;
 import com.music.content.entity.Song;
 import com.music.content.entity.SongArtist;
 import com.music.content.mapper.AlbumMapper;
 import com.music.content.mapper.AlbumSongMapper;
 import com.music.content.mapper.ArtistMapper;
+import com.music.content.mapper.LyricsMapper;
 import com.music.content.mapper.SongArtistMapper;
 import com.music.content.mapper.SongMapper;
 import com.music.content.service.LyricsService;
@@ -34,18 +36,26 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements SongService {
-    
+
+    private static final Pattern LRC_TIME_PATTERN = Pattern.compile("\\[(\\d{2}:\\d{2}(?:\\.\\d{2,3})?)\\]");
+    private static final Pattern LRC_METADATA_PATTERN = Pattern.compile("^\\[(ti|ar|al|by|offset|re|ve):.*]$", Pattern.CASE_INSENSITIVE);
+
     private final ArtistMapper artistMapper;
     private final AlbumMapper albumMapper;
     private final SongArtistMapper songArtistMapper;
     private final AlbumSongMapper albumSongMapper;
+    private final LyricsMapper lyricsMapper;
     private final LyricsService lyricsService;
     private final StorageConfig storageConfig;
     
@@ -64,9 +74,18 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
         LambdaQueryWrapper<Song> wrapper = new LambdaQueryWrapper<>();
         
         if (StringUtils.hasText(query.getKeyword())) {
-            wrapper.like(Song::getTitle, query.getKeyword())
-                   .or()
-                   .like(Song::getTitleEn, query.getKeyword());
+            String keyword = query.getKeyword().trim();
+            wrapper.and(w -> w.like(Song::getTitle, keyword)
+                    .or()
+                    .like(Song::getTitleEn, keyword)
+                    .or()
+                    .like(Song::getArtistNames, keyword)
+                    .or()
+                    .apply("EXISTS (SELECT 1 FROM content_artist a WHERE a.id = content_song.artist_id AND a.deleted = 0 AND a.name LIKE CONCAT('%',{0},'%'))", keyword)
+                    .or()
+                    .apply("EXISTS (SELECT 1 FROM content_song_artist sa JOIN content_artist a ON a.id = sa.artist_id AND a.deleted = 0 WHERE sa.song_id = content_song.id AND sa.deleted = 0 AND a.name LIKE CONCAT('%',{0},'%'))", keyword)
+                    .or()
+                    .apply("EXISTS (SELECT 1 FROM content_lyrics l WHERE l.song_id = content_song.id AND l.deleted = 0 AND l.content LIKE CONCAT('%',{0},'%'))", keyword));
         }
         if (query.getArtistId() != null) {
             // 包含主歌手或合唱歌手的歌曲（content_song_artist 关联）
@@ -103,8 +122,15 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
         Page<Song> songPage = page(page, wrapper);
         
         Page<SongVO> voPage = new Page<>(query.getCurrent(), query.getSize(), songPage.getTotal());
-        voPage.setRecords(songPage.getRecords().stream().map(this::convertToVO).toList());
-        
+        String keyword = StringUtils.hasText(query.getKeyword()) ? query.getKeyword().trim() : null;
+        voPage.setRecords(songPage.getRecords().stream().map(song -> {
+            SongVO vo = convertToVO(song);
+            if (StringUtils.hasText(keyword)) {
+                vo.setLyricSnippet(buildLyricSnippet(song.getId(), keyword));
+            }
+            return vo;
+        }).toList());
+
         return voPage;
     }
     
@@ -506,7 +532,7 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
         Objects.requireNonNull(song, "song");
         SongVO vo = new SongVO();
         BeanUtils.copyProperties(song, vo);
-        
+
         Artist artist = artistMapper.selectById(song.getArtistId());
         if (artist != null) {
             vo.setArtistName(artist.getName());
@@ -517,22 +543,71 @@ public class SongServiceImpl extends ServiceImpl<SongMapper, Song> implements So
         } else if (artist != null) {
             vo.setArtistNames(artist.getName());
         }
-        
+
         Album album = albumMapper.selectById(song.getAlbumId());
         if (album != null) {
             vo.setAlbumName(album.getName());
         }
-        
+
         if (song.getFileSize() != null) {
             vo.setFileSizeFormat(FileUtils.formatFileSize(song.getFileSize()));
         }
         if (song.getDuration() != null) {
             vo.setDurationFormat(FileUtils.formatDuration(song.getDuration()));
         }
-        
+
         // 根据数据库中的歌词记录设置hasLyrics字段
         vo.setHasLyrics(lyricsService.hasLyrics(song.getId()) ? 1 : 0);
-        
+
         return vo;
     }
+
+    private String buildLyricSnippet(Long songId, String keyword) {
+        if (songId == null || !StringUtils.hasText(keyword)) return null;
+
+        Lyrics lyrics = lyricsMapper.selectOne(new LambdaQueryWrapper<Lyrics>()
+                .eq(Lyrics::getSongId, songId)
+                .orderByDesc(Lyrics::getId)
+                .last("LIMIT 1"));
+        if (lyrics == null || !StringUtils.hasText(lyrics.getContent())) return null;
+
+        String normalized = lyrics.getContent().replace("\r\n", "\n").replace("\r", "\n");
+        String[] rawLines = normalized.split("\n");
+        List<String> lyricLines = new ArrayList<>(rawLines.length);
+        for (String rawLine : rawLines) {
+            String cleaned = cleanLyricLine(rawLine);
+            if (cleaned.isEmpty()) continue;
+            lyricLines.add(cleaned);
+        }
+
+        String keywordLower = keyword.trim().toLowerCase(Locale.ROOT);
+        for (int i = 0; i < lyricLines.size(); i++) {
+            String text = lyricLines.get(i);
+            if (!text.toLowerCase(Locale.ROOT).contains(keywordLower)) continue;
+
+            String prev = i > 0 ? lyricLines.get(i - 1) : "";
+            String next = i + 1 < lyricLines.size() ? lyricLines.get(i + 1) : "";
+
+            StringBuilder sb = new StringBuilder();
+            if (!prev.isEmpty()) sb.append(prev).append(" ");
+            sb.append(text);
+            if (!next.isEmpty()) sb.append(" ").append(next);
+            return sb.toString().trim();
+        }
+
+        return null;
+    }
+
+    private String cleanLyricLine(String line) {
+        if (!StringUtils.hasText(line)) return "";
+
+        String normalized = line.trim();
+        if (normalized.isEmpty()) return "";
+        if (LRC_METADATA_PATTERN.matcher(normalized).matches()) return "";
+
+        Matcher matcher = LRC_TIME_PATTERN.matcher(normalized);
+        String withoutTimestamp = matcher.replaceAll("").trim();
+        return withoutTimestamp;
+    }
 }
+

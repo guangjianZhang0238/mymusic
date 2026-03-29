@@ -15,7 +15,9 @@ const artistPool = ref<any[]>([])
 const hotSongPool = ref<any[]>([])
 const displayArtists = ref<any[]>([])
 const displayHotSongs = ref<any[]>([])
+const lastHotSongBatchIds = ref<number[]>([])
 const loading = ref(false)
+const hotSongsRefreshing = ref(false)
 const error = ref('')
 
 const HOT_ARTIST_POOL_SIZE = 50
@@ -27,6 +29,11 @@ const toNumber = (value: unknown) => {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
 }
+
+const sortSongsByPlayCount = <T>(list: T[]) =>
+  [...(list || [])].sort((a, b) => toNumber((b as any)?.playCount) - toNumber((a as any)?.playCount))
+
+const getSongId = (song: any) => toNumber(song?.id)
 
 const pickRandomItems = <T>(list: T[], count: number) => {
   if (!Array.isArray(list) || !list.length || count <= 0) {
@@ -40,8 +47,41 @@ const pickRandomItems = <T>(list: T[], count: number) => {
   return copy.slice(0, Math.min(count, copy.length))
 }
 
-const refreshHotSongs = () => {
-  displayHotSongs.value = pickRandomItems(hotSongPool.value, HOT_SONG_DISPLAY_SIZE)
+const resetDisplayHotSongsFromPool = () => {
+  const sortedPool = sortSongsByPlayCount(hotSongPool.value)
+  const previousBatchSet = new Set(lastHotSongBatchIds.value)
+  const nonDuplicateBatch = sortedPool.filter((song) => !previousBatchSet.has(getSongId(song)))
+
+  const nextBatch: any[] = [...nonDuplicateBatch.slice(0, HOT_SONG_DISPLAY_SIZE)]
+  if (nextBatch.length < HOT_SONG_DISPLAY_SIZE) {
+    const nextBatchIdSet = new Set(nextBatch.map((song) => getSongId(song)))
+    const fallbackBatch = sortedPool
+      .filter((song) => !nextBatchIdSet.has(getSongId(song)))
+      .slice(0, HOT_SONG_DISPLAY_SIZE - nextBatch.length)
+    nextBatch.push(...fallbackBatch)
+  }
+
+  displayHotSongs.value = nextBatch
+  lastHotSongBatchIds.value = nextBatch.map((song) => getSongId(song)).filter((id) => id > 0)
+}
+
+const fetchHotSongs = async () => {
+  const hotSongs = await getHotSongsApi(HOT_SONG_POOL_SIZE)
+  hotSongPool.value = Array.isArray(hotSongs) ? sortSongsByPlayCount(hotSongs) : []
+}
+
+const refreshHotSongs = async () => {
+  hotSongsRefreshing.value = true
+  try {
+    await fetchHotSongs()
+    resetDisplayHotSongsFromPool()
+  } catch (e: any) {
+    // Keep interaction responsive even when request fails.
+    resetDisplayHotSongsFromPool()
+    ElMessage.error(e?.message || '刷新热门歌曲失败')
+  } finally {
+    hotSongsRefreshing.value = false
+  }
 }
 
 const refreshHotArtists = () => {
@@ -57,12 +97,9 @@ onMounted(async () => {
   loading.value = true
   error.value = ''
   try {
-    const hotSongs = await getHotSongsApi()
-    hotSongPool.value = [...(hotSongs || [])]
-      .sort((a, b) => toNumber((b as any)?.playCount) - toNumber((a as any)?.playCount))
-      .slice(0, HOT_SONG_POOL_SIZE)
+    await fetchHotSongs()
     await buildHotArtistPool()
-    refreshHotSongs()
+    resetDisplayHotSongsFromPool()
     refreshHotArtists()
   } catch (e: any) {
     error.value = e?.message || '首页数据加载失败'
@@ -73,6 +110,7 @@ onMounted(async () => {
 
 const getSongTitle = (song: any) => getDisplaySongTitle(song)
 const getSongArtist = (song: any) => song?.artistName || song?.artistNames || '未知歌手'
+const getSongPlayCount = (song: any) => toNumber(song?.playCount).toLocaleString('zh-CN')
 const getArtistAvatar = (artist: any) => normalizeImageUrl(artist?.avatar)
 
 const startPlayNow = async (songId: number) => {
@@ -142,7 +180,7 @@ const goArtistRank = () => {
           <div class="hero-subtitle">为你精选当下热门歌曲与歌手，点一下就开播</div>
           <div class="hero-actions">
             <el-button type="primary" round :disabled="!displayHotSongs.length" @click="playAllHotSongs">一键播放热门</el-button>
-            <el-button round :disabled="hotSongPool.length <= 1" @click="refreshHotSongs">刷新歌曲推荐</el-button>
+            <el-button :loading="hotSongsRefreshing" round :disabled="hotSongPool.length <= 1" @click="refreshHotSongs">刷新歌曲推荐</el-button>
           </div>
         </div>
         <div class="hero-stats">
@@ -168,26 +206,44 @@ const goArtistRank = () => {
               <span class="panel-title">热门歌曲</span>
               <div class="panel-header-actions">
                 <el-button text type="primary" :disabled="!displayHotSongs.length" @click="playAllHotSongs">播放全部</el-button>
-                <el-button text type="primary" :disabled="hotSongPool.length <= 1" @click="refreshHotSongs">换一批</el-button>
+                <el-button
+                  text
+                  type="primary"
+                  :loading="hotSongsRefreshing"
+                  :disabled="hotSongPool.length <= 1"
+                  @click="refreshHotSongs"
+                >
+                  换一批
+                </el-button>
               </div>
             </div>
           </template>
           <div class="home-panel-body">
             <StateBlock :empty="!displayHotSongs.length" empty-text="暂无热门歌曲">
-              <el-table :data="displayHotSongs" height="100%" class="song-table">
-                <el-table-column label="歌曲">
+              <el-table :data="displayHotSongs" height="100%" class="song-table" stripe>
+                <el-table-column label="#" width="54" align="center">
+                  <template #default="{ $index }">
+                    <span class="song-rank" :class="{ 'song-rank-top': $index < 3 }">{{ $index + 1 }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="歌曲" min-width="60" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="song-title">{{ getSongTitle(row) }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="歌手">
+                <el-table-column label="歌手" min-width="60" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="song-artist">{{ getSongArtist(row) }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="230">
+                <el-table-column label="播放量" width="60" align="center">
                   <template #default="{ row }">
-                    <el-space>
+                    <span class="song-play-count">{{ getSongPlayCount(row) }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="" width="208" align="right">
+                  <template #default="{ row }">
+                    <el-space class="song-actions" wrap>
                       <el-button class="mini-action-btn" size="small" plain @click="appendSong(row.id)">加列表</el-button>
                       <el-button class="mini-action-btn" size="small" plain @click="playNextSong(row.id)">下一曲</el-button>
                       <el-button type="primary" text @click="play(row.id)">播放</el-button>
@@ -235,9 +291,11 @@ const goArtistRank = () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(96vw, 175vh);
+  width: min(96vw, 1200px);
+  max-width: 100%;
   margin: 1.6vh auto 2vh;
   padding: 0;
+  box-sizing: border-box;
 }
 
 .hero-section {
@@ -332,6 +390,8 @@ const goArtistRank = () => {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .home-panel :deep(.el-card__header) {
@@ -370,9 +430,51 @@ const goArtistRank = () => {
   overflow-y: auto;
 }
 
+.song-table :deep(.el-table__inner-wrapper::before) {
+  display: none;
+}
+
+.song-table :deep(.el-table__header th) {
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .song-table :deep(.el-table__cell) {
-  padding-top: 6px;
-  padding-bottom: 6px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.song-table :deep(.cell) {
+  min-width: 0;
+}
+
+.song-table :deep(.el-table__row:hover > td.el-table__cell) {
+  background: #f8fbff;
+}
+
+.song-actions {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.song-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.song-rank-top {
+  color: #1d4ed8;
+  background: #dbeafe;
 }
 
 .song-title {
@@ -386,10 +488,26 @@ const goArtistRank = () => {
   color: #475569;
 }
 
+.song-play-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f766e;
+}
+
 .mini-action-btn {
   font-size: 12px;
-  padding-left: 7px;
-  padding-right: 7px;
+  border-color: #dbeafe;
+  color: #2563eb;
+  background: #eff6ff;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.mini-action-btn:hover,
+.mini-action-btn:focus {
+  border-color: #93c5fd;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .artist-grid {
@@ -465,6 +583,8 @@ const goArtistRank = () => {
 
   .panel-grid {
     min-height: auto;
+    height: auto;
+    max-height: none;
     grid-template-columns: 1fr;
   }
 
@@ -492,6 +612,16 @@ const goArtistRank = () => {
 
   .artist-grid {
     grid-template-columns: 1fr;
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .song-table :deep(.el-table__cell) {
+    padding-top: 5px;
+    padding-bottom: 5px;
   }
 }
 </style>

@@ -58,8 +58,12 @@ public class AppMusicServiceImpl implements AppMusicService {
     }
 
     @Override
-    public List<AppSongVO> hotSongs() {
-        return songService.getHotSongs().stream().map(this::toAppSongVO).toList();
+    public List<AppSongVO> hotSongs(int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 200));
+        return songService.getHotSongs().stream()
+                .map(this::toAppSongVO)
+                .limit(safeLimit)
+                .toList();
     }
 
     @Override

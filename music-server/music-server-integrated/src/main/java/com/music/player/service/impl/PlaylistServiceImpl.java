@@ -151,6 +151,15 @@ public class PlaylistServiceImpl extends ServiceImpl<PlaylistMapper, Playlist> i
     }
 
     @Override
+    @Transactional
+    public void clearPlaylistSongs(Long playlistId) {
+        LambdaQueryWrapper<PlaylistSong> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(PlaylistSong::getPlaylistId, playlistId);
+        playlistSongMapper.delete(wrapper);
+        updateSongCount(playlistId);
+    }
+
+    @Override
     public List<Long> getPlaylistSongs(Long playlistId) {
         LambdaQueryWrapper<PlaylistSong> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PlaylistSong::getPlaylistId, playlistId);

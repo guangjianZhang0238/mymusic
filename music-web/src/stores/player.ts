@@ -121,7 +121,11 @@ export const usePlayerStore = defineStore('player', {
       } else {
         const idx = this.queue.findIndex((id) => Number(id) === targetId)
         if (idx < 0) {
-          await this.replaceQueue([targetId], 0)
+          this.queue.push(targetId)
+          this.currentIndex = this.queue.length - 1
+          this.currentSongId = targetId
+          await this.persistQueue()
+          await this.refreshQueueSongs()
         } else {
           this.currentIndex = idx
           this.currentSongId = targetId
@@ -138,7 +142,10 @@ export const usePlayerStore = defineStore('player', {
     async appendSongs(songIds: number[]) {
       const ids = normalizeIds(songIds)
       if (!ids.length) return
-      this.queue.push(...ids)
+      const exists = new Set(this.queue.map((id) => Number(id)))
+      const toAppend = ids.filter((id) => !exists.has(id))
+      if (!toAppend.length) return
+      this.queue.push(...toAppend)
       await this.persistQueue()
       await this.refreshQueueSongs()
     },

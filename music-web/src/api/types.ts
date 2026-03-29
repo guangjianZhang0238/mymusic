@@ -21,6 +21,7 @@ export interface Song {
   duration?: number
   filePath?: string
   fileUrl?: string
+  lyricSnippet?: string
 }
 
 export interface Artist {

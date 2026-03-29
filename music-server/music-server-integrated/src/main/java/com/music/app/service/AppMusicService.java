@@ -12,7 +12,7 @@ public interface AppMusicService {
 
     Page<AppSongVO> pageSongs(Integer current, Integer size, String keyword, Long albumId, Long artistId);
 
-    List<AppSongVO> hotSongs();
+    List<AppSongVO> hotSongs(int limit);
 
     /**
      * 获取热门歌手（按“歌手参与歌曲数 songCount”口径排序）

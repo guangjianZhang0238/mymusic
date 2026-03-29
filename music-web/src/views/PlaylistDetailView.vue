@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { addSongToPlaylistApi, getPlaylistDetailApi, getPlaylistSongsApi, getSongPageApi, getSongsByIdsApi, removeSongFromPlaylistApi } from '@/api/music'
+import {
+  addSongToPlaylistApi,
+  clearPlaylistSongsApi,
+  getPlaylistDetailApi,
+  getPlaylistSongsApi,
+  getSongPageApi,
+  getSongsByIdsApi,
+  removeSongFromPlaylistApi
+} from '@/api/music'
 import { usePlayerStore } from '@/stores/player'
 import StateBlock from '@/components/StateBlock.vue'
 import { ElMessage } from 'element-plus'
@@ -71,6 +79,16 @@ const removeSong = async (songId: number) => {
   }
 }
 
+const clearSongs = async () => {
+  try {
+    await clearPlaylistSongsApi(id)
+    await load()
+    ElMessage.success('已清空歌单歌曲')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '清空失败')
+  }
+}
+
 const play = async (songId: number) => {
   await player.playBySongId(songId)
   router.push(`/player/${songId}`)
@@ -100,6 +118,11 @@ const playNextSong = async (songId: number) => {
     <h2 class="page-title">{{ playlist.name || '歌单详情' }}</h2>
     <el-space>
       <el-button @click="router.push('/library')">返回歌单</el-button>
+      <el-popconfirm title="确认清空该歌单内所有歌曲吗？" @confirm="clearSongs">
+        <template #reference>
+          <el-button type="danger" plain>清空歌曲</el-button>
+        </template>
+      </el-popconfirm>
       <el-button type="primary" @click="openAdd">+ 添加歌曲</el-button>
     </el-space>
   </div>

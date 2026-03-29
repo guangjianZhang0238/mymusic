@@ -49,9 +49,11 @@ public class AppMusicController {
 
     @Operation(summary = "App端热门歌曲")
     @GetMapping("/song/hot")
-    public Result<List<AppSongVO>> hotSongs() {
-        log.info("访问接口：开始查询热门歌曲");
-        return Result.success(appMusicService.hotSongs());
+    public Result<List<AppSongVO>> hotSongs(
+            @RequestParam(defaultValue = "100") int limit
+    ) {
+        log.info("访问接口：开始查询热门歌曲，数量: {}", limit);
+        return Result.success(appMusicService.hotSongs(limit));
     }
 
     @Operation(summary = "App端热门歌手")

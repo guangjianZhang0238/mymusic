@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { getAlbumPageApi, getArtistPageApi, getSearchSuggestionsApi, getSongPageApi } from '@/api/music'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { getAlbumPageApi, getArtistPageApi, getArtistTopSongsApi, getSearchSuggestionsApi, getSongPageApi } from '@/api/music'
 import { createFeedbackApi } from '@/api/social'
 import { usePlayerStore } from '@/stores/player'
 import { playerAudio } from '@/utils/playerAudio'
@@ -10,6 +10,7 @@ import { ElMessage } from 'element-plus'
 import { normalizeImageUrl } from '@/utils/image'
 import { getDisplaySongTitle } from '@/utils/songTitle'
 
+const route = useRoute()
 const router = useRouter()
 const player = usePlayerStore()
 const keyword = ref('')
@@ -22,6 +23,137 @@ const suggesting = ref(false)
 const error = ref('')
 
 const allResultsCount = computed(() => songs.value.length + albums.value.length + artists.value.length)
+
+const escapeHtml = (value: string) =>
+  String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+const escapeRegExp = (value: string) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const highlightKeyword = (text?: string) => {
+  const source = String(text || '').trim()
+  const kw = keyword.value.trim()
+  if (!source) return ''
+  if (!kw) return escapeHtml(source)
+
+  const pattern = new RegExp(`(${escapeRegExp(kw)})`, 'gi')
+  return escapeHtml(source).replace(pattern, '<mark class="kw-mark">$1</mark>')
+}
+
+const getCenteredSnippet = (text?: string) => {
+  const source = String(text || '').trim()
+  if (!source) return ''
+
+  const kw = keyword.value.trim()
+  const maxLength = 36
+  if (source.length <= maxLength) return source
+  if (!kw) return `${source.slice(0, maxLength)}…`
+
+  const lowerSource = source.toLowerCase()
+  const lowerKw = kw.toLowerCase()
+  const hitIndex = lowerSource.indexOf(lowerKw)
+  if (hitIndex < 0) {
+    return `${source.slice(0, maxLength)}…`
+  }
+
+  const available = Math.max(0, maxLength - lowerKw.length)
+  const before = Math.floor(available / 2)
+  let start = Math.max(0, hitIndex - before)
+  let end = start + maxLength
+
+  if (end > source.length) {
+    end = source.length
+    start = Math.max(0, end - maxLength)
+  }
+
+  const snippet = source.slice(start, end)
+  const prefix = start > 0 ? '…' : ''
+  const suffix = end < source.length ? '…' : ''
+  return `${prefix}${snippet}${suffix}`
+}
+
+const splitArtistTokens = (value?: string) => {
+  const raw = String(value || '').trim()
+  if (!raw) return [] as string[]
+  return raw
+    .split(/[\/、,，&＆;；|]+/u)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+const mergeSongArtistNames = (song: any) => {
+  const fromArtistName = splitArtistTokens(song?.artistName)
+  const fromArtistNames = splitArtistTokens(song?.artistNames)
+  const merged = [...fromArtistName, ...fromArtistNames].filter(Boolean)
+  return Array.from(new Set(merged))
+}
+
+const enrichSongArtistsByKeyword = async (query: string) => {
+  const keywordText = String(query || '').trim().toLowerCase()
+  if (!keywordText || !songs.value.length || !artists.value.length) return
+
+  const artistIdByName = new Map<string, number>()
+  for (const artist of artists.value) {
+    const name = String(artist?.name || '').trim()
+    const id = Number(artist?.id)
+    if (!name || !Number.isFinite(id) || id <= 0) continue
+    artistIdByName.set(name.toLowerCase(), id)
+  }
+  if (!artistIdByName.size) return
+
+  const songIdsNeedingEnrich = songs.value
+    .filter((song) => {
+      const mergedNames = mergeSongArtistNames(song)
+      return !mergedNames.some((name) => name.toLowerCase().includes(keywordText))
+    })
+    .map((song) => Number(song?.id))
+    .filter((id) => Number.isFinite(id) && id > 0)
+
+  if (!songIdsNeedingEnrich.length) return
+
+  const topSongsByArtist = await Promise.all(
+    Array.from(artistIdByName.values()).map(async (artistId) => {
+      try {
+        const list = await getArtistTopSongsApi(artistId, 200)
+        return Array.isArray(list) ? list : []
+      } catch {
+        return []
+      }
+    })
+  )
+
+  const extraArtistNamesBySongId = new Map<number, Set<string>>()
+  for (const list of topSongsByArtist) {
+    for (const song of list) {
+      const sid = Number(song?.id)
+      if (!Number.isFinite(sid) || sid <= 0) continue
+      const names = mergeSongArtistNames(song)
+      if (!names.length) continue
+      if (!extraArtistNamesBySongId.has(sid)) {
+        extraArtistNamesBySongId.set(sid, new Set())
+      }
+      const bucket = extraArtistNamesBySongId.get(sid)!
+      names.forEach((name) => bucket.add(name))
+    }
+  }
+
+  songs.value = songs.value.map((song) => {
+    const sid = Number(song?.id)
+    const extraNames = extraArtistNamesBySongId.get(sid)
+    if (!extraNames || !extraNames.size) return song
+
+    const merged = Array.from(new Set([...mergeSongArtistNames(song), ...Array.from(extraNames)]))
+    return {
+      ...song,
+      artistName: merged.join(' / '),
+      artistNames: merged.join(' / ')
+    }
+  })
+}
 
 const querySearchSuggestions = async (queryString: string, cb: (items: any[]) => void) => {
   if (!queryString.trim()) {
@@ -68,6 +200,7 @@ const search = async () => {
     }
 
     await doSearch(kw)
+    await enrichSongArtistsByKeyword(kw)
 
     // 如果用户输入看起来像“拼音首拼”（纯字母），但分页搜索三类结果都为空，
     // 则用联想接口的第一个候选名再搜索一次，提升可用性。
@@ -84,6 +217,7 @@ const search = async () => {
         if (mappedName && mappedName !== kw) {
           keyword.value = mappedName
           await doSearch(mappedName)
+          await enrichSongArtistsByKeyword(mappedName)
         }
       } catch {
         // ignore fallback errors
@@ -117,6 +251,19 @@ const suggestionTypeText = (type?: number) => {
 const playSong = async (songId: number) => {
   try {
     await player.playBySongId(songId)
+    const targetSrc = `/api/app/music/song/${songId}/stream`
+    const sameSource = !!playerAudio.src && playerAudio.src.includes(targetSrc)
+    if (!sameSource) {
+      playerAudio.src = targetSrc
+      playerAudio.load()
+    }
+    try {
+      await playerAudio.play()
+      player.playing = true
+    } catch {
+      // Keep playing flag for PlayerView autoplay retry after route navigation.
+      player.playing = true
+    }
     router.push(`/player/${songId}`)
   } catch (e: any) {
     ElMessage.error(e?.message || '播放失败')
@@ -187,6 +334,27 @@ const playNextSong = async (songId: number) => {
     ElMessage.error(e?.message || '操作失败')
   }
 }
+
+const syncKeywordFromRouteAndSearch = async () => {
+  const kw = String(route.query.keyword || '').trim()
+  if (!kw) return
+  if (kw !== keyword.value) {
+    keyword.value = kw
+  }
+  await search()
+}
+
+onMounted(async () => {
+  await syncKeywordFromRouteAndSearch()
+})
+
+watch(
+  () => route.query.keyword,
+  async (next, prev) => {
+    if (next === prev) return
+    await syncKeywordFromRouteAndSearch()
+  }
+)
 </script>
 
 <template>
@@ -274,7 +442,13 @@ const playNextSong = async (songId: number) => {
               <div v-for="row in songs" :key="row.id" class="song-row">
                 <div class="song-main">
                   <div class="song-title" :title="getDisplaySongTitle(row)">{{ getDisplaySongTitle(row) }}</div>
-                  <div class="song-artist" :title="row.artistName || '未知歌手'">{{ row.artistName || '未知歌手' }}</div>
+                  <div class="song-artist" :title="row.artistNames || row.artistName || '未知歌手'">{{ row.artistNames || row.artistName || '未知歌手' }}</div>
+                  <div
+                    v-if="row.lyricSnippet"
+                    class="song-lyric-snippet"
+                    :title="row.lyricSnippet"
+                    v-html="highlightKeyword(getCenteredSnippet(row.lyricSnippet))"
+                  ></div>
                 </div>
                 <div class="song-actions">
                   <el-button class="mini-action-btn" text @click="appendSong(row.id)">加列表</el-button>
@@ -442,6 +616,22 @@ const playNextSong = async (songId: number) => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.song-lyric-snippet {
+  color: #94a3b8;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-lyric-snippet :deep(.kw-mark) {
+  background: rgba(56, 189, 248, 0.2);
+  color: #0f172a;
+  padding: 0 2px;
+  border-radius: 4px;
 }
 
 .song-actions {

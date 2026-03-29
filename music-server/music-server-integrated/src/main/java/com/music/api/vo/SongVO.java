@@ -76,6 +76,9 @@ public class SongVO {
     
     @Schema(description = "播放次数")
     private Integer playCount;
+
+    @Schema(description = "歌词命中片段（含上下文）")
+    private String lyricSnippet;
     
     @Schema(description = "排序")
     private Integer sortOrder;
