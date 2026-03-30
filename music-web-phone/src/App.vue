@@ -13,19 +13,19 @@ const user = useUserStore()
 const player = usePlayerStore()
 
 const tabMenus = [
-  { path: '/home', label: 'Home' },
-  { path: '/discover', label: 'Discover' },
-  { path: '/library', label: 'Library' },
-  { path: '/player', label: 'Player' },
-  { path: '/profile', label: 'Profile' }
+  { path: '/home', label: '现在听', icon: '♪' },
+  { path: '/discover', label: '发现', icon: '◉' },
+  { path: '/library', label: '资料库', icon: '≣' },
+  { path: '/player', label: '播放', icon: '▶' },
+  { path: '/profile', label: '我的', icon: '☺' }
 ]
 
 const moreMenus = [
-  { path: '/search', label: 'Search' },
-  { path: '/artist-rank', label: 'Artist Rank' },
-  { path: '/settings', label: 'Settings' },
-  { path: '/feedback', label: 'Feedback' },
-  { path: '/lyrics-share', label: 'Lyrics Share' }
+  { path: '/search', label: '搜索' },
+  { path: '/artist-rank', label: '歌手排行' },
+  { path: '/settings', label: '设置' },
+  { path: '/feedback', label: '反馈' },
+  { path: '/lyrics-share', label: '歌词分享' }
 ]
 
 const headerKeyword = ref('')
@@ -291,7 +291,7 @@ watch(
     <header class="mobile-header glow-card">
       <div class="brand" @click="go('/home')">
         <div class="brand-title">MyMusic</div>
-        <div class="brand-subtitle">Phone Player</div>
+        <div class="brand-subtitle">Listen Now</div>
       </div>
 
       <div class="header-search">
@@ -303,7 +303,7 @@ watch(
           :trigger-on-focus="false"
           :debounce="220"
           :loading="headerSuggesting"
-          placeholder="Search songs or artists"
+          placeholder="搜索歌曲、歌手、专辑"
           @select="onHeaderSuggestionSelect"
           @keyup.enter="onHeaderSearchEnter"
         >
@@ -314,7 +314,7 @@ watch(
             </div>
           </template>
         </el-autocomplete>
-        <button class="header-action-btn" @click="onHeaderSearchEnter">Search</button>
+        <button class="header-action-btn" @click="onHeaderSearchEnter">搜索</button>
       </div>
     </header>
 
@@ -325,12 +325,12 @@ watch(
     <div v-if="showMiniPlayer" class="mini-player" :class="{ disabled: !hasSong }">
       <div class="mini-top" :class="{ clickable: hasSong }" @click="goCurrentPlayer">
         <div class="mini-title" :title="currentSongLabel">{{ currentSongLabel }}</div>
-        <div class="mini-subtitle">{{ hasSong ? currentSongArtist : 'Open Home or Discover to select music' }}</div>
+        <div class="mini-subtitle">{{ hasSong ? currentSongArtist : '去首页或发现页选择歌曲' }}</div>
       </div>
       <div class="mini-controls">
-        <button class="mini-icon-btn" :disabled="!hasSong" @click="playPrev">Prev</button>
-        <button class="mini-play-btn" :disabled="!hasSong" @click="togglePlayback">{{ isPlaying ? 'Pause' : 'Play' }}</button>
-        <button class="mini-icon-btn" :disabled="!hasSong" @click="playNext">Next</button>
+        <button class="mini-icon-btn" :disabled="!hasSong" @click="playPrev">上一首</button>
+        <button class="mini-play-btn" :disabled="!hasSong" @click="togglePlayback">{{ isPlaying ? '暂停' : '播放' }}</button>
+        <button class="mini-icon-btn" :disabled="!hasSong" @click="playNext">下一首</button>
       </div>
       <div class="mini-progress">
         <span class="mini-progress-bar" :style="{ width: `${progressPercent}%` }" />
@@ -345,10 +345,12 @@ watch(
         :class="{ active: isTabActive(item.path) }"
         @click="go(item.path)"
       >
-        {{ item.label }}
+        <span class="tab-icon">{{ item.icon }}</span>
+        <span class="tab-text">{{ item.label }}</span>
       </button>
       <button class="tab-btn" :class="{ active: moreMenuActive || showMoreSheet }" @click="showMoreSheet = !showMoreSheet">
-        More
+        <span class="tab-icon">⋯</span>
+        <span class="tab-text">更多</span>
       </button>
     </nav>
 
@@ -365,7 +367,7 @@ watch(
             {{ item.label }}
           </button>
 
-          <button class="more-item danger" @click="logout">Logout</button>
+          <button class="more-item danger" @click="logout">退出登录</button>
         </section>
       </div>
     </transition>
@@ -376,11 +378,11 @@ watch(
 
 <style scoped>
 .mobile-shell {
-  min-height: 100vh;
+  min-height: 100dvh;
   background:
-    radial-gradient(circle at 10% -10%, rgba(96, 165, 250, 0.22), transparent 48%),
-    radial-gradient(circle at 90% -10%, rgba(251, 113, 133, 0.2), transparent 42%),
-    #f8fafc;
+    radial-gradient(circle at 8% -16%, rgba(10, 132, 255, 0.12), transparent 52%),
+    radial-gradient(circle at 92% -18%, rgba(250, 45, 72, 0.1), transparent 48%),
+    #f5f5f7;
 }
 
 .mobile-header {
@@ -389,11 +391,11 @@ watch(
   z-index: 40;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 12px 10px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
+  gap: 8px;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(14px);
 }
 
 .brand {
@@ -407,18 +409,21 @@ watch(
 
 .brand-title {
   font-weight: 800;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1;
-  letter-spacing: 0.2px;
-  background: linear-gradient(130deg, #fb7185, #60a5fa 56%, #22d3ee);
+  letter-spacing: -0.01em;
+  background: linear-gradient(120deg, #fa2d48, #ff5f70 46%, #0a84ff);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .brand-subtitle {
-  color: #64748b;
-  font-size: 12px;
+  color: #8e8e93;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .header-search {
@@ -436,37 +441,43 @@ watch(
   border-radius: 999px;
   padding-left: 12px;
   padding-right: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.quick-search :deep(.el-input__inner) {
+  font-size: 13px;
 }
 
 .header-action-btn {
   flex: 0 0 auto;
-  height: 34px;
-  padding: 0 14px;
+  height: 36px;
+  padding: 0 16px;
   border: 0;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(135deg, #fb7185, #38bdf8);
-  box-shadow: 0 8px 20px rgba(56, 189, 248, 0.24);
+  background: linear-gradient(120deg, #fa2d48, #ff5f70);
+  box-shadow: 0 8px 16px rgba(250, 45, 72, 0.24);
 }
 
 .mobile-main {
-  padding: 10px 10px 178px;
+  padding: 8px 8px 206px;
 }
 
 .mini-player {
   position: fixed;
-  left: 10px;
-  right: 10px;
-  bottom: calc(64px + env(safe-area-inset-bottom));
+  left: 8px;
+  right: 8px;
+  bottom: calc(70px + env(safe-area-inset-bottom));
   z-index: 35;
-  border-radius: 16px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.14);
-  backdrop-filter: blur(14px);
-  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 14px 30px rgba(17, 17, 17, 0.12);
+  backdrop-filter: blur(16px);
+  padding: 10px 12px;
 }
 
 .mini-player.disabled {
@@ -482,9 +493,9 @@ watch(
 }
 
 .mini-title {
-  color: #0f172a;
+  color: #1d1d1f;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -492,7 +503,7 @@ watch(
 
 .mini-subtitle {
   margin-top: 2px;
-  color: #64748b;
+  color: #8e8e93;
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -509,21 +520,21 @@ watch(
 .mini-icon-btn,
 .mini-play-btn {
   border: 0;
-  height: 34px;
-  border-radius: 10px;
+  height: 36px;
+  border-radius: 12px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .mini-icon-btn {
-  color: #0f172a;
-  background: #e2e8f0;
+  color: #1d1d1f;
+  background: #f2f2f7;
 }
 
 .mini-play-btn {
   color: #ffffff;
-  background: linear-gradient(135deg, #fb7185, #38bdf8);
+  background: linear-gradient(120deg, #fa2d48, #ff5f70);
 }
 
 .mini-icon-btn:disabled,
@@ -536,7 +547,7 @@ watch(
   margin-top: 8px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(203, 213, 225, 0.65);
+  background: rgba(17, 17, 17, 0.08);
   overflow: hidden;
 }
 
@@ -544,7 +555,7 @@ watch(
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #fb7185, #38bdf8);
+  background: linear-gradient(90deg, #fa2d48, #ff5f70);
   transition: width 0.25s ease;
 }
 
@@ -557,25 +568,40 @@ watch(
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 0;
-  border-top: 1px solid rgba(148, 163, 184, 0.22);
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(14px);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
 .tab-btn {
   border: 0;
   background: transparent;
-  color: #64748b;
-  font-size: 11px;
+  color: #8e8e93;
+  font-size: 10px;
   font-weight: 600;
-  line-height: 1.2;
-  padding: 10px 6px;
+  line-height: 1.1;
+  padding: 8px 4px 10px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
 }
 
 .tab-btn.active {
-  color: #0f172a;
-  background: linear-gradient(180deg, rgba(125, 211, 252, 0.22), rgba(248, 250, 252, 0));
+  color: #1d1d1f;
+  background: linear-gradient(180deg, rgba(10, 132, 255, 0.08), rgba(255, 255, 255, 0));
+}
+
+.tab-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.tab-text {
+  font-size: 10px;
+  line-height: 1;
 }
 
 .more-sheet-mask {
@@ -589,22 +615,22 @@ watch(
 
 .more-sheet {
   width: 100%;
-  border-radius: 18px 18px 0 0;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 20px 20px 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.88);
   border-bottom: 0;
-  background: #ffffff;
-  box-shadow: 0 -20px 40px rgba(15, 23, 42, 0.22);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 -18px 36px rgba(17, 17, 17, 0.2);
   padding: 12px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
 }
 
 .more-item {
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  color: #0f172a;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  background: #f5f5f7;
+  color: #1d1d1f;
   border-radius: 12px;
   min-height: 42px;
   font-size: 13px;
@@ -612,8 +638,8 @@ watch(
 }
 
 .more-item.active {
-  border-color: #7dd3fc;
-  background: linear-gradient(135deg, rgba(251, 113, 133, 0.2), rgba(56, 189, 248, 0.22));
+  border-color: rgba(10, 132, 255, 0.45);
+  background: rgba(10, 132, 255, 0.08);
 }
 
 .more-item.danger {
@@ -630,7 +656,7 @@ watch(
 }
 
 .header-suggestion-name {
-  color: #0f172a;
+  color: #1d1d1f;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -638,7 +664,7 @@ watch(
 }
 
 .header-suggestion-artist {
-  color: #94a3b8;
+  color: #8e8e93;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -657,9 +683,10 @@ watch(
   .mobile-shell {
     max-width: 480px;
     margin: 0 auto;
-    min-height: 100vh;
-    border-left: 1px solid rgba(148, 163, 184, 0.28);
-    border-right: 1px solid rgba(148, 163, 184, 0.28);
+    min-height: 100dvh;
+    border-left: 1px solid rgba(17, 17, 17, 0.08);
+    border-right: 1px solid rgba(17, 17, 17, 0.08);
+    background-color: #f5f5f7;
   }
 }
 </style>

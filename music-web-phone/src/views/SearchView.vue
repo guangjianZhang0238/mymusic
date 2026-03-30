@@ -468,10 +468,13 @@ watch(
 .search-toolbar {
   width: 100%;
   justify-content: space-between;
+  align-items: center;
+  gap: 8px;
 }
 
 .search-autocomplete {
-  width: min(620px, 100%);
+  flex: 1;
+  min-width: 0;
 }
 
 .suggestion-option {
@@ -513,13 +516,13 @@ watch(
 .results-grid {
   display: flex;
   align-items: flex-start;
-  gap: 24px;
+  gap: 12px;
   min-width: 0;
 }
 
 .result-panel {
   border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 14px;
+  border-radius: 16px;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.92), rgba(248, 250, 252, 0.68));
   padding: 12px;
   min-width: 0;
@@ -578,10 +581,10 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 10px;
   border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.78);
 }
 
@@ -639,6 +642,7 @@ watch(
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .artist-list-scroll,
@@ -762,6 +766,63 @@ watch(
 .artist-list-scroll::-webkit-scrollbar-thumb:hover,
 .songs-table-scroll-wrap :deep(.el-table__body-wrapper::-webkit-scrollbar-thumb:hover) {
   background: rgba(100, 116, 139, 0.75);
+}
+
+@media (max-width: 960px) {
+  .search-toolbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .search-autocomplete {
+    grid-column: 1 / -1;
+  }
+
+  .search-toolbar :deep(.el-button) {
+    width: 100%;
+    margin: 0;
+  }
+
+  .search-results-card {
+    max-height: none;
+  }
+
+  .results-grid {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .two-col-panel,
+  .artist-panel-single {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .section-title-with-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .section-title-with-actions :deep(.el-space) {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .song-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .song-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .album-list-scroll {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 

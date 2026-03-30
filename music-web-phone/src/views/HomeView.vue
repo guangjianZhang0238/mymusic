@@ -1,5 +1,5 @@
-<script setup lang="ts">
-import { onMounted, ref } from 'vue'
+﻿<script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { getHotArtistsApi, getHotSongsApi } from '@/api/music'
 import { usePlayerStore } from '@/stores/player'
@@ -19,6 +19,7 @@ const lastHotSongBatchIds = ref<number[]>([])
 const loading = ref(false)
 const hotSongsRefreshing = ref(false)
 const error = ref('')
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth <= 960 : true)
 
 const HOT_ARTIST_POOL_SIZE = 50
 const HOT_ARTIST_DISPLAY_SIZE = 9
@@ -78,7 +79,7 @@ const refreshHotSongs = async () => {
   } catch (e: any) {
     // Keep interaction responsive even when request fails.
     resetDisplayHotSongsFromPool()
-    ElMessage.error(e?.message || '刷新热门歌曲失败')
+    ElMessage.error(e?.message || '鍒锋柊鐑棬姝屾洸澶辫触')
   } finally {
     hotSongsRefreshing.value = false
   }
@@ -88,12 +89,17 @@ const refreshHotArtists = () => {
   displayArtists.value = pickRandomItems(artistPool.value, HOT_ARTIST_DISPLAY_SIZE)
 }
 
+const onResize = () => {
+  isMobile.value = window.innerWidth <= 960
+}
+
 const buildHotArtistPool = async () => {
   const artists = await getHotArtistsApi(HOT_ARTIST_POOL_SIZE)
   artistPool.value = Array.isArray(artists) ? [...artists] : []
 }
 
 onMounted(async () => {
+  window.addEventListener('resize', onResize)
   loading.value = true
   error.value = ''
   try {
@@ -102,14 +108,18 @@ onMounted(async () => {
     resetDisplayHotSongsFromPool()
     refreshHotArtists()
   } catch (e: any) {
-    error.value = e?.message || '首页数据加载失败'
+    error.value = e?.message || '棣栭〉鏁版嵁鍔犺浇澶辫触'
   } finally {
     loading.value = false
   }
 })
 
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', onResize)
+})
+
 const getSongTitle = (song: any) => getDisplaySongTitle(song)
-const getSongArtist = (song: any) => song?.artistName || song?.artistNames || '未知歌手'
+const getSongArtist = (song: any) => song?.artistName || song?.artistNames || '鏈煡姝屾墜'
 const getSongPlayCount = (song: any) => toNumber(song?.playCount).toLocaleString('zh-CN')
 const getArtistAvatar = (artist: any) => normalizeImageUrl(artist?.avatar)
 
@@ -130,7 +140,7 @@ const play = async (songId: number) => {
     await startPlayNow(songId)
     router.push(`/player/${songId}`)
   } catch (e: any) {
-    ElMessage.error(e?.message || '播放失败')
+    ElMessage.error(e?.message || '鎾斁澶辫触')
   }
 }
 
@@ -143,25 +153,25 @@ const playAllHotSongs = async () => {
     await startPlayNow(ids[0])
     router.push(`/player/${ids[0]}`)
   } catch (e: any) {
-    ElMessage.error(e?.message || '播放失败')
+    ElMessage.error(e?.message || '鎾斁澶辫触')
   }
 }
 
 const appendSong = async (songId: number) => {
   try {
     await player.addToQueueTail(songId)
-    ElMessage.success('已添加到播放列表')
+    ElMessage.success('宸叉坊鍔犲埌鎾斁鍒楄〃')
   } catch (e: any) {
-    ElMessage.error(e?.message || '添加失败')
+    ElMessage.error(e?.message || '娣诲姞澶辫触')
   }
 }
 
 const playNextSong = async (songId: number) => {
   try {
     await player.playNext(songId)
-    ElMessage.success('已加入下一曲播放')
+    ElMessage.success('已加入下一首播放')
   } catch (e: any) {
-    ElMessage.error(e?.message || '操作失败')
+    ElMessage.error(e?.message || '鎿嶄綔澶辫触')
   }
 }
 
@@ -171,16 +181,16 @@ const goArtistRank = () => {
 </script>
 
 <template>
-  <h2 class="page-title">首页</h2>
+  <h2 class="page-title">棣栭〉</h2>
   <StateBlock :loading="loading" :error="error">
     <div class="home-page">
       <section class="hero-section">
         <div class="hero-main">
-          <div class="hero-title">今天想听点什么？</div>
-          <div class="hero-subtitle">为你精选当下热门歌曲与歌手，点一下就开播</div>
+          <div class="hero-title">浠婂ぉ鎯冲惉鐐逛粈涔堬紵</div>
+          <div class="hero-subtitle">为你精选当下热门歌曲与歌手，点一下就开播。</div>
           <div class="hero-actions">
             <el-button type="primary" round :disabled="!displayHotSongs.length" @click="playAllHotSongs">一键播放热门</el-button>
-            <el-button :loading="hotSongsRefreshing" round :disabled="hotSongPool.length <= 1" @click="refreshHotSongs">刷新歌曲推荐</el-button>
+            <el-button :loading="hotSongsRefreshing" round :disabled="hotSongPool.length <= 1" @click="refreshHotSongs">鍒锋柊姝屾洸鎺ㄨ崘</el-button>
           </div>
         </div>
         <div class="hero-stats">
@@ -189,7 +199,7 @@ const goArtistRank = () => {
             <div class="stat-value">{{ hotSongPool.length }}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">当前展示</div>
+            <div class="stat-label">褰撳墠灞曠ず</div>
             <div class="stat-value">{{ displayHotSongs.length }}</div>
           </div>
           <div class="stat-card">
@@ -203,9 +213,9 @@ const goArtistRank = () => {
         <el-card class="glow-card home-panel songs-panel">
           <template #header>
             <div class="panel-header">
-              <span class="panel-title">热门歌曲</span>
+              <span class="panel-title">鐑棬姝屾洸</span>
               <div class="panel-header-actions">
-                <el-button text type="primary" :disabled="!displayHotSongs.length" @click="playAllHotSongs">播放全部</el-button>
+                <el-button text type="primary" :disabled="!displayHotSongs.length" @click="playAllHotSongs">鎾斁鍏ㄩ儴</el-button>
                 <el-button
                   text
                   type="primary"
@@ -213,30 +223,46 @@ const goArtistRank = () => {
                   :disabled="hotSongPool.length <= 1"
                   @click="refreshHotSongs"
                 >
-                  换一批
+                  鎹竴鎵?
                 </el-button>
               </div>
             </div>
           </template>
           <div class="home-panel-body">
-            <StateBlock :empty="!displayHotSongs.length" empty-text="暂无热门歌曲">
-              <el-table :data="displayHotSongs" height="100%" class="song-table" stripe>
+            <StateBlock :empty="!displayHotSongs.length" empty-text="鏆傛棤鐑棬姝屾洸">
+              <div v-if="isMobile" class="song-mobile-list">
+                <div v-for="(row, index) in displayHotSongs" :key="row.id" class="song-mobile-item">
+                  <div class="song-mobile-main">
+                    <span class="song-rank" :class="{ 'song-rank-top': index < 3 }">{{ index + 1 }}</span>
+                    <div class="song-mobile-meta">
+                      <span class="song-title" :title="getSongTitle(row)">{{ getSongTitle(row) }}</span>
+                      <span class="song-artist" :title="getSongArtist(row)">{{ getSongArtist(row) }}</span>
+                    </div>
+                  </div>
+                  <div class="song-mobile-actions">
+                    <el-button class="mini-action-btn" size="small" plain @click="appendSong(row.id)">加队列</el-button>
+                    <el-button class="mini-action-btn" size="small" plain @click="playNextSong(row.id)">下一首</el-button>
+                    <el-button type="primary" plain size="small" @click="play(row.id)">播放</el-button>
+                  </div>
+                </div>
+              </div>
+              <el-table v-else :data="displayHotSongs" height="100%" class="song-table" stripe>
                 <el-table-column label="#" width="54" align="center">
                   <template #default="{ $index }">
                     <span class="song-rank" :class="{ 'song-rank-top': $index < 3 }">{{ $index + 1 }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="歌曲" min-width="60" show-overflow-tooltip>
+                <el-table-column label="姝屾洸" min-width="60" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="song-title">{{ getSongTitle(row) }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="歌手" min-width="60" show-overflow-tooltip>
+                <el-table-column label="姝屾墜" min-width="60" show-overflow-tooltip>
                   <template #default="{ row }">
                     <span class="song-artist">{{ getSongArtist(row) }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column label="播放量" width="60" align="center">
+                <el-table-column label="播放量" width="72" align="center">
                   <template #default="{ row }">
                     <span class="song-play-count">{{ getSongPlayCount(row) }}</span>
                   </template>
@@ -244,9 +270,9 @@ const goArtistRank = () => {
                 <el-table-column label="" width="208" align="right">
                   <template #default="{ row }">
                     <el-space class="song-actions" wrap>
-                      <el-button class="mini-action-btn" size="small" plain @click="appendSong(row.id)">加列表</el-button>
-                      <el-button class="mini-action-btn" size="small" plain @click="playNextSong(row.id)">下一曲</el-button>
-                      <el-button type="primary" text @click="play(row.id)">播放</el-button>
+                      <el-button class="mini-action-btn" size="small" plain @click="appendSong(row.id)">加队列</el-button>
+                      <el-button class="mini-action-btn" size="small" plain @click="playNextSong(row.id)">下一首</el-button>
+                      <el-button type="primary" text @click="play(row.id)">鎾斁</el-button>
                     </el-space>
                   </template>
                 </el-table-column>
@@ -258,12 +284,12 @@ const goArtistRank = () => {
         <el-card class="glow-card home-panel artists-panel">
           <template #header>
             <div class="panel-header">
-              <span class="panel-title">热门歌手</span>
+              <span class="panel-title">鐑棬姝屾墜</span>
               <el-button text type="primary" :disabled="artistPool.length <= 1" @click="refreshHotArtists">换一批</el-button>
             </div>
           </template>
           <div class="home-panel-body">
-            <StateBlock :empty="!displayArtists.length" empty-text="暂无歌手">
+            <StateBlock :empty="!displayArtists.length" empty-text="鏆傛棤姝屾墜">
               <div class="artist-grid">
                 <el-card v-for="artist in displayArtists" :key="artist.id" class="card-soft artist-card" shadow="hover">
                   <el-avatar :src="getArtistAvatar(artist)" :size="36" class="artist-avatar">
@@ -271,12 +297,12 @@ const goArtistRank = () => {
                   </el-avatar>
                   <div class="artist-main">
                     <div class="artist-name" :title="artist.name">{{ artist.name }}</div>
-                    <el-button text size="small" class="artist-detail-btn" @click="router.push(`/artist/${artist.id}`)">查看详情</el-button>
+                    <el-button text size="small" class="artist-detail-btn" @click="router.push(`/artist/${artist.id}`)">鏌ョ湅璇︽儏</el-button>
                   </div>
                 </el-card>
               </div>
               <div class="artist-more-wrap">
-                <el-link type="primary" :underline="false" @click="goArtistRank">查看更多热门歌手</el-link>
+                <el-link type="primary" :underline="false" @click="goArtistRank">鏌ョ湅鏇村鐑棬姝屾墜</el-link>
               </div>
             </StateBlock>
           </div>
@@ -459,6 +485,44 @@ const goArtistRank = () => {
   justify-content: flex-end;
 }
 
+.song-mobile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  max-height: 100%;
+  padding-right: 2px;
+}
+
+.song-mobile-item {
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.song-mobile-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.song-mobile-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.song-mobile-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
 .song-rank {
   display: inline-flex;
   align-items: center;
@@ -611,7 +675,7 @@ const goArtistRank = () => {
   }
 
   .artist-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .panel-header {
@@ -619,9 +683,23 @@ const goArtistRank = () => {
     gap: 6px;
   }
 
-  .song-table :deep(.el-table__cell) {
-    padding-top: 5px;
-    padding-bottom: 5px;
+  .panel-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .song-mobile-actions :deep(.el-button) {
+    width: 100%;
+  }
+
+  .hero-actions {
+    width: 100%;
+  }
+
+  .hero-actions :deep(.el-button) {
+    flex: 1;
+    min-width: 0;
   }
 }
 </style>
+

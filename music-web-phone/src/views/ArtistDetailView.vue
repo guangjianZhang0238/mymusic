@@ -122,7 +122,7 @@ const playNextSong = async (songId: number) => {
   <h2 class="page-title">歌手：{{ artist.name || '未知歌手' }}</h2>
   <StateBlock :loading="loading" :error="error">
     <el-row :gutter="16">
-      <el-col :span="12">
+      <el-col :xs="24" :md="12">
         <el-card class="glow-card">
           <template #header>
             <div class="header-actions">
@@ -154,7 +154,7 @@ const playNextSong = async (songId: number) => {
           </StateBlock>
         </el-card>
       </el-col>
-      <el-col :span="12">
+      <el-col :xs="24" :md="12">
         <el-card class="glow-card">
           <template #header>相关专辑（{{ albums.length }}）</template>
           <StateBlock :empty="!albums.length" empty-text="暂无相关专辑">
@@ -247,5 +247,22 @@ const playNextSong = async (songId: number) => {
   font-size: 12px;
   padding-left: 8px;
   padding-right: 8px;
+}
+
+@media (max-width: 960px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-actions :deep(.el-space) {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .album-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

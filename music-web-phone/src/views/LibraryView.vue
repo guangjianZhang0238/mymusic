@@ -142,12 +142,12 @@ const addSong = async (songId: number) => {
     <template #footer><el-button @click="visible = false">取消</el-button><el-button type="primary" @click="submit">保存</el-button></template>
   </el-dialog>
 
-  <el-dialog v-model="addVisible" title="添加歌曲到歌单" width="640px">
+  <el-dialog v-model="addVisible" title="添加歌曲到歌单" width="min(96vw, 640px)">
     <el-space wrap>
       <el-input
         v-model="searchKey"
         placeholder="输入歌曲名/歌手名"
-        style="width: 360px"
+        class="dialog-search-input"
         clearable
         @keyup.enter="search"
       />
@@ -183,5 +183,22 @@ const addSong = async (songId: number) => {
 
 .search-result-wrap {
   margin-top: 12px;
+}
+
+.dialog-search-input {
+  width: 360px;
+  max-width: 100%;
+}
+
+@media (max-width: 960px) {
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .page-head :deep(.el-button) {
+    width: 100%;
+  }
 }
 </style>

@@ -193,4 +193,25 @@ const playNextSong = async (songId: number) => {
   padding-left: 8px;
   padding-right: 8px;
 }
+
+@media (max-width: 960px) {
+  .header-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .header-actions :deep(.el-space) {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .song-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .song-actions :deep(.el-button) {
+    min-width: 0;
+  }
+}
 </style>

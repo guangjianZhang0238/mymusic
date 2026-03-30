@@ -432,7 +432,12 @@ let lastLoadedSongDetailsId = 0
 const feedbackVisible = ref(false)
 const feedbackSubmitting = ref(false)
 const lyricScrollRef = ref<HTMLElement | null>(null)
+const lyricProgrammaticScrolling = ref(false)
+const lyricManualPause = ref(false)
 let lyricJumpHintTimer: number | undefined
+let lyricManualPauseTimer: number | undefined
+let lyricProgrammaticReleaseTimer: number | undefined
+const commentQuickActions = ['太好听了', '单曲循环中', '歌词很戳我', '已加入收藏']
 const feedbackForm = ref({
   type: 'BUG',
   content: '',
@@ -1534,6 +1539,8 @@ onBeforeUnmount(() => {
   window.removeEventListener(USER_SETTINGS_UPDATED_EVENT, onUserSettingsUpdated as EventListener)
   if (seekReleaseTimer) window.clearTimeout(seekReleaseTimer)
   if (lyricJumpHintTimer) window.clearTimeout(lyricJumpHintTimer)
+  if (lyricManualPauseTimer) window.clearTimeout(lyricManualPauseTimer)
+  if (lyricProgrammaticReleaseTimer) window.clearTimeout(lyricProgrammaticReleaseTimer)
   if (persistTimer) window.clearTimeout(persistTimer)
   if (spectrumStartRetryTimer) window.clearTimeout(spectrumStartRetryTimer)
   if (spectrumFrame) {
@@ -1586,25 +1593,88 @@ const onSeekChange = (e: Event) => {
   seekTo(Number(target.value))
 }
 
+const showLyricHint = (text: string, duration = 1200) => {
+  if (lyricJumpHintTimer) window.clearTimeout(lyricJumpHintTimer)
+  lyricJumpHint.value = text
+  if (duration <= 0) {
+    lyricJumpHintTimer = undefined
+    return
+  }
+  lyricJumpHintTimer = window.setTimeout(() => {
+    lyricJumpHint.value = ''
+    lyricJumpHintTimer = undefined
+  }, duration)
+}
+
+const scrollToActiveLyric = (behavior: ScrollBehavior = 'smooth') => {
+  if (!lyricScrollRef.value || activeLyric.value < 0) return
+  const container = lyricScrollRef.value
+  const activeEl = container.querySelector('.lyric-line.is-active') as HTMLElement | null
+  if (!activeEl) return
+  lyricProgrammaticScrolling.value = true
+  if (lyricProgrammaticReleaseTimer) window.clearTimeout(lyricProgrammaticReleaseTimer)
+  const targetTop = activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2
+  container.scrollTo({
+    top: Math.max(targetTop, 0),
+    behavior
+  })
+  lyricProgrammaticReleaseTimer = window.setTimeout(() => {
+    lyricProgrammaticScrolling.value = false
+    lyricProgrammaticReleaseTimer = undefined
+  }, 260)
+}
+
+const onLyricManualScroll = () => {
+  if (!lyricAutoScroll.value) return
+  if (lyricProgrammaticScrolling.value) return
+  lyricManualPause.value = true
+  if (lyricManualPauseTimer) window.clearTimeout(lyricManualPauseTimer)
+  lyricManualPauseTimer = window.setTimeout(() => {
+    lyricManualPause.value = false
+    lyricManualPauseTimer = undefined
+  }, 2400)
+  showLyricHint('已暂停自动跟随，点“回到当前”继续', 1500)
+}
+
 const jumpToLyricLine = (line: any) => {
   const targetMs = Number(line?.time ?? NaN)
   if (!Number.isFinite(targetMs)) return
   const targetSec = targetMs / 1000
   seekTo(targetSec)
-  if (lyricJumpHintTimer) window.clearTimeout(lyricJumpHintTimer)
-  lyricJumpHint.value = `已跳转到 ${formatTime(targetSec)}`
-  lyricJumpHintTimer = window.setTimeout(() => {
-    lyricJumpHint.value = ''
-    lyricJumpHintTimer = undefined
-  }, 1200)
+  showLyricHint(`已跳转到 ${formatTime(targetSec)}`)
 }
 
 const toggleLyricAutoScroll = () => {
   lyricAutoScroll.value = !lyricAutoScroll.value
+  lyricManualPause.value = false
+  if (lyricAutoScroll.value) {
+    scrollToActiveLyric()
+    showLyricHint('自动跟随已开启', 1000)
+    return
+  }
+  showLyricHint('自动跟随已关闭', 1000)
 }
 
 const nudgeLyricFontSize = (delta: number) => {
   lyricFontSize.value = clamp(lyricFontSize.value + delta, 12, 34)
+}
+
+const resumeLyricAutoFollow = () => {
+  lyricManualPause.value = false
+  if (lyricManualPauseTimer) {
+    window.clearTimeout(lyricManualPauseTimer)
+    lyricManualPauseTimer = undefined
+  }
+  scrollToActiveLyric()
+  showLyricHint('已回到当前歌词', 1000)
+}
+
+const appendQuickComment = (text: string) => {
+  const phrase = String(text || '').trim()
+  if (!phrase) return
+  const current = commentContent.value.trim()
+  const nextContent = current ? `${current} ${phrase}` : phrase
+  commentContent.value = nextContent.slice(0, 300)
 }
 
 const onPlayModeChange = (mode: PlayMode) => {
@@ -1881,11 +1951,11 @@ const modeSymbol = computed(() => {
 const publishComment = async () => {
   if (!songId.value) return
   if (commentSubmitting.value) return
+  const content = commentContent.value.trim()
+  if (!content) return ElMessage.warning('评论内容不能为空')
   commentSubmitting.value = true
-  if (!commentContent.value.trim()) commentSubmitting.value = false
-  if (!commentContent.value.trim()) return ElMessage.warning('评论内容不能为空')
   try {
-    await addCommentApi(songId.value, commentContent.value)
+    await addCommentApi(songId.value, content)
     commentContent.value = ''
     await loadComments()
     ElMessage.success('评论已发布')
@@ -2001,17 +2071,19 @@ watch(
   () => activeLyric.value,
   () => {
     if (!lyricAutoScroll.value) return
+    if (lyricManualPause.value) return
     if (detailTab.value !== 'lyrics') return
-    if (!lyricScrollRef.value || activeLyric.value < 0) return
-    const activeEl = lyricScrollRef.value.querySelector('.lyric-line.is-active') as HTMLElement | null
-    if (!activeEl) return
-    // 仅滚动歌词容器，避免浏览器把整个页面一起滚动
-    const container = lyricScrollRef.value
-    const targetTop = activeEl.offsetTop - container.clientHeight / 2 + activeEl.clientHeight / 2
-    container.scrollTo({
-      top: Math.max(targetTop, 0),
-      behavior: 'smooth'
-    })
+    scrollToActiveLyric('smooth')
+  }
+)
+
+watch(
+  () => detailTab.value,
+  (tab) => {
+    if (tab !== 'lyrics') return
+    if (!lyricAutoScroll.value) return
+    lyricManualPause.value = false
+    window.setTimeout(() => scrollToActiveLyric('auto'), 0)
   }
 )
 </script>
@@ -2050,32 +2122,22 @@ watch(
           </div>
 
           <div class="player-actions">
-            <el-button circle title="上一首" @click="prev">⏮</el-button>
-            <el-button circle type="primary" :title="store.playing ? '暂停' : '播放'" @click="toggle">
-              {{ store.playing ? '⏸' : '▶' }}
-            </el-button>
-            <el-button circle title="下一首" @click="next">⏭</el-button>
-            <el-button circle :title="favorited ? '取消收藏' : '收藏'" @click="toggleFavorite">
-              {{ favorited ? '⭐' : '☆' }}
-            </el-button>
-            <el-button
-              round
-              :type="detailTab === 'lyrics' ? 'primary' : 'default'"
-              @click="detailTab = 'lyrics'"
-            >
-              歌词页
-            </el-button>
-            <el-button
-              round
-              :type="detailTab === 'comments' ? 'primary' : 'default'"
-              @click="detailTab = 'comments'"
-            >
-              评论
-            </el-button>
-            <el-button round @click="feedbackVisible = true">反馈</el-button>
+            <div class="transport-main">
+              <el-button class="transport-btn secondary" circle title="上一首" @click="prev">⏮</el-button>
+              <el-button class="transport-btn primary" circle type="primary" :title="store.playing ? '暂停' : '播放'" @click="toggle">
+                {{ store.playing ? '❚❚' : '▶' }}
+              </el-button>
+              <el-button class="transport-btn secondary" circle title="下一首" @click="next">⏭</el-button>
+            </div>
+
+            <div class="transport-sub">
+              <el-button class="chip-btn" round :title="favorited ? '取消收藏' : '收藏'" @click="toggleFavorite">
+                {{ favorited ? '已收藏' : '收藏' }}
+              </el-button>
               <el-dropdown @command="onPlayModeChange">
-                <el-button circle :title="playModeOptions.find((item) => item.value === store.playMode)?.label || '播放模式'">
-                  {{ modeSymbol }}
+                <el-button class="chip-btn" round :title="playModeOptions.find((item) => item.value === store.playMode)?.label || '播放模式'">
+                  <span class="mode-symbol">{{ modeSymbol }}</span>
+                  <span>{{ playModeOptions.find((item) => item.value === store.playMode)?.label || '播放模式' }}</span>
                 </el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
@@ -2085,6 +2147,15 @@ watch(
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
+              <el-button class="chip-btn" round @click="feedbackVisible = true">反馈</el-button>
+            </div>
+
+            <div class="detail-switch" role="tablist" aria-label="详情区切换">
+              <button class="detail-switch-btn" :class="{ active: detailTab === 'lyrics' }" @click="detailTab = 'lyrics'">歌词</button>
+              <button class="detail-switch-btn" :class="{ active: detailTab === 'comments' }" @click="detailTab = 'comments'">
+                评论 {{ comments.length }}
+              </button>
+            </div>
           </div>
         </el-card>
 
@@ -2110,8 +2181,9 @@ watch(
           <template v-if="detailTab === 'lyrics'">
             <div class="lyric-toolbar">
               <button class="lyric-tool-btn" @click="toggleLyricAutoScroll">
-                {{ lyricAutoScroll ? '自动滚动：开' : '自动滚动：关' }}
+                {{ lyricAutoScroll ? '自动跟随：开' : '自动跟随：关' }}
               </button>
+              <button class="lyric-tool-btn" @click="resumeLyricAutoFollow">回到当前</button>
               <div class="lyric-font-tools">
                 <button class="lyric-font-btn" @click="nudgeLyricFontSize(-1)">A-</button>
                 <span class="lyric-font-value">{{ lyricFontSize }}</span>
@@ -2120,7 +2192,7 @@ watch(
               <span v-if="lyricJumpHint" class="lyric-jump-hint">{{ lyricJumpHint }}</span>
             </div>
             <StateBlock :empty="!lyrics.length" empty-text="暂无歌词">
-              <div ref="lyricScrollRef" class="lyric-scroll-wrap">
+              <div ref="lyricScrollRef" class="lyric-scroll-wrap" @scroll.passive="onLyricManualScroll">
                 <div
                   v-for="(line, index) in lyrics"
                   :key="index"
@@ -2130,47 +2202,78 @@ watch(
                   @click="jumpToLyricLine(line)"
                 >
                   <span class="lyric-text">{{ line.text }}</span>
-                  <span v-if="index === activeLyric && store.playing" class="lyric-wave" aria-hidden="true">
-                    <i></i><i></i><i></i>
+                  <span class="lyric-side">
+                    <span class="lyric-time">{{ formatTime(Number(line?.time || 0) / 1000) }}</span>
+                    <span v-if="index === activeLyric && store.playing" class="lyric-wave" aria-hidden="true">
+                      <i></i><i></i><i></i>
+                    </span>
                   </span>
                 </div>
               </div>
             </StateBlock>
           </template>
           <template v-else>
-            <el-input
-              class="comment-input"
-              v-model="commentContent"
-              type="textarea"
-              :rows="3"
-              maxlength="300"
-              show-word-limit
-              placeholder="说点什么..."
-            />
-            <el-button class="comment-submit-btn" type="primary" style="margin-top: 10px" :loading="commentSubmitting" @click="publishComment">发布评论</el-button>
-            <StateBlock
-              style="margin-top: 10px"
-              :loading="commentsLoading"
-              :error="commentsError"
-              :empty="!comments.length"
-              empty-text="暂无评论"
-            >
-              <el-table :data="comments">
-                <el-table-column prop="content" label="内容" min-width="260" />
-                <el-table-column prop="likeCount" label="点赞" width="90" />
-                <el-table-column label="操作" width="220">
-                  <template #default="{ row }">
-                    <el-space>
-                      <el-button text @click="likeComment(row)">点赞</el-button>
-                      <el-button text @click="unlikeComment(row)">取消赞</el-button>
-                      <el-popconfirm title="确认删除这条评论吗？" @confirm="removeComment(row.id)">
-                        <template #reference><el-button text type="danger">删除</el-button></template>
-                      </el-popconfirm>
-                    </el-space>
-                  </template>
-                </el-table-column>
-              </el-table>
-            </StateBlock>
+            <div class="comment-panel">
+              <div class="comment-quick-actions">
+                <button
+                  v-for="item in commentQuickActions"
+                  :key="item"
+                  class="comment-quick-btn"
+                  type="button"
+                  @click="appendQuickComment(item)"
+                >
+                  {{ item }}
+                </button>
+              </div>
+
+              <StateBlock
+                class="comment-state"
+                :loading="commentsLoading"
+                :error="commentsError"
+                :empty="!comments.length"
+                empty-text="暂无评论"
+              >
+                <div class="comment-list">
+                  <article v-for="row in comments" :key="row.id" class="comment-row">
+                    <p class="comment-row-content">{{ row.content }}</p>
+                    <div class="comment-row-meta">
+                      <span class="comment-row-like">👍 {{ Number(row.likeCount || 0) }}</span>
+                      <div class="comment-row-actions">
+                        <button class="comment-action-btn" type="button" @click="likeComment(row)">赞</button>
+                        <button class="comment-action-btn" type="button" @click="unlikeComment(row)">取消</button>
+                        <el-popconfirm title="确认删除这条评论吗？" @confirm="removeComment(row.id)">
+                          <template #reference>
+                            <button class="comment-action-btn danger" type="button">删</button>
+                          </template>
+                        </el-popconfirm>
+                      </div>
+                    </div>
+                  </article>
+                </div>
+              </StateBlock>
+
+              <div class="comment-composer">
+                <el-input
+                  class="comment-input"
+                  v-model="commentContent"
+                  type="textarea"
+                  :rows="2"
+                  maxlength="300"
+                  show-word-limit
+                  resize="none"
+                  placeholder="写下你的感受…"
+                />
+                <el-button
+                  class="comment-submit-btn"
+                  type="primary"
+                  :loading="commentSubmitting"
+                  :disabled="!commentContent.trim()"
+                  @click="publishComment"
+                >
+                  发布
+                </el-button>
+              </div>
+            </div>
           </template>
         </el-card>
       </div>
@@ -2821,6 +2924,19 @@ watch(
   flex: 1;
 }
 
+.lyric-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #94a3b8;
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+
+.lyric-time {
+  line-height: 1;
+}
+
 .lyric-line.is-active {
   color: #38bdf8;
   background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), rgba(56, 189, 248, 0.04));
@@ -3018,17 +3134,127 @@ watch(
   justify-content: space-between;
 }
 
-.comment-input {
+.comment-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  height: 100%;
+}
+
+.comment-state {
+  min-height: 0;
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 110px;
+}
+
+.comment-row {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 10px 12px;
+}
+
+.comment-row-content {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.55;
+  font-size: 14px;
+}
+
+.comment-row-meta {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.comment-row-like {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.comment-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comment-action-btn {
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: #ffffff;
+  color: #334155;
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.comment-action-btn.danger {
+  border-color: rgba(239, 68, 68, 0.28);
+  color: #be123c;
+  background: #fff1f2;
+}
+
+.comment-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.comment-quick-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.comment-quick-btn {
+  border: 1px solid rgba(10, 132, 255, 0.2);
+  background: rgba(10, 132, 255, 0.08);
+  color: #0a84ff;
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.comment-composer {
   position: sticky;
-  bottom: 56px;
-  z-index: 2;
+  bottom: 0;
+  z-index: 3;
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+}
+
+.comment-input {
+  min-width: 0;
+}
+
+.comment-input :deep(.el-textarea__inner) {
+  min-height: 72px;
 }
 
 .comment-submit-btn {
-  position: sticky;
-  bottom: 56px;
-  z-index: 2;
-  width: 100%;
+  min-height: 40px;
+  padding-left: 16px;
+  padding-right: 16px;
 }
 
 .progress-wrap {
@@ -3046,30 +3272,89 @@ watch(
 }
 
 .player-actions {
-  margin-top: 10px;
+  margin-top: 12px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
 }
 
-.player-actions :deep(.el-button:nth-child(2)) {
-  width: 62px;
-  height: 62px;
-  font-size: 22px;
-  box-shadow: 0 14px 28px rgba(56, 189, 248, 0.25);
+.transport-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
 }
 
-.player-actions :deep(.el-button:nth-child(1)),
-.player-actions :deep(.el-button:nth-child(3)) {
-  width: 44px;
-  height: 44px;
-  font-size: 17px;
+.transport-btn {
+  border-width: 0;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.player-actions :deep(.el-button:nth-child(n + 5):nth-child(-n + 7)) {
+.transport-btn.secondary {
+  width: 46px;
+  height: 46px;
+  font-size: 18px;
+  color: #334155;
+  background: #eef2ff;
+}
+
+.transport-btn.primary {
+  width: 66px;
+  height: 66px;
+  font-size: 24px;
+  box-shadow: 0 14px 28px rgba(250, 45, 72, 0.28);
+}
+
+.transport-btn:hover {
+  transform: translateY(-1px);
+}
+
+.transport-sub {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.chip-btn {
+  width: 100%;
+  min-height: 36px;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.chip-btn span + span {
+  margin-left: 4px;
+}
+
+.mode-symbol {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.detail-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 999px;
+  padding: 4px;
+  background: rgba(241, 245, 249, 0.7);
+}
+
+.detail-switch-btn {
+  border: 0;
   min-height: 34px;
-  padding-left: 14px;
-  padding-right: 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  background: transparent;
+}
+
+.detail-switch-btn.active {
+  color: #ffffff;
+  background: linear-gradient(120deg, #fa2d48, #ff5f70);
+  box-shadow: 0 8px 16px rgba(250, 45, 72, 0.24);
 }
 
 .song-meta-row {
@@ -3895,16 +4180,22 @@ watch(
     padding: 10px;
     border-radius: 14px;
     border: 1px solid rgba(148, 163, 184, 0.26);
-    background: rgba(255, 255, 255, 0.92);
+    background: rgba(255, 255, 255, 0.94);
     backdrop-filter: blur(10px);
     box-shadow: 0 14px 28px rgba(15, 23, 42, 0.12);
   }
 
-  .player-actions :deep(.el-button:nth-child(5)),
-  .player-actions :deep(.el-button:nth-child(6)),
-  .player-actions :deep(.el-button:nth-child(7)) {
-    flex: 1;
-    min-width: 0;
+  .transport-sub {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .chip-btn {
+    min-height: 38px;
+    font-size: 12px;
+  }
+
+  .detail-switch-btn {
+    min-height: 36px;
   }
 
   .effect-row {
@@ -3939,9 +4230,12 @@ watch(
     padding-bottom: 6px;
   }
 
-  .comment-input,
-  .comment-submit-btn {
+  .comment-composer {
     bottom: calc(58px + env(safe-area-inset-bottom));
+  }
+
+  .comment-list {
+    padding-bottom: 132px;
   }
 
   .lyric-detail-card :deep(.el-card__body),

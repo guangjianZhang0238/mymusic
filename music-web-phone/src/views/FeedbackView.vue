@@ -38,16 +38,16 @@ const submit = async () => {
 
 <template>
   <h2 class="page-title">反馈</h2>
-  <el-card class="glow-card">
+  <el-card class="glow-card feedback-form-card">
     <template #header>提交新反馈</template>
-    <el-select v-model="form.type" style="width: 180px">
+    <el-select v-model="form.type" class="feedback-type-select">
       <el-option label="问题" value="BUG" />
       <el-option label="建议" value="SUGGESTION" />
       <el-option label="功能" value="FEATURE" />
     </el-select>
     <el-input v-model="form.content" type="textarea" :rows="4" maxlength="400" show-word-limit placeholder="请描述你遇到的问题或建议" style="margin-top: 8px" />
     <el-input v-model="form.contact" placeholder="联系方式（选填）" style="margin-top: 8px" />
-    <el-button type="primary" style="margin-top: 8px" @click="submit">提交反馈</el-button>
+    <el-button class="feedback-submit-btn" type="primary" style="margin-top: 8px" @click="submit">提交反馈</el-button>
   </el-card>
 
   <el-card class="glow-card" style="margin-top: 16px">
@@ -62,3 +62,19 @@ const submit = async () => {
     </StateBlock>
   </el-card>
 </template>
+
+<style scoped>
+.feedback-type-select {
+  width: 180px;
+}
+
+@media (max-width: 960px) {
+  .feedback-type-select {
+    width: 100%;
+  }
+
+  .feedback-submit-btn {
+    width: 100%;
+  }
+}
+</style>

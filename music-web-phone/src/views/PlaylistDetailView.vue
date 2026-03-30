@@ -153,12 +153,12 @@ const playNextSong = async (songId: number) => {
     </StateBlock>
   </el-card>
 
-  <el-dialog v-model="addVisible" title="添加歌曲到歌单" width="640px">
+  <el-dialog v-model="addVisible" title="添加歌曲到歌单" width="min(96vw, 640px)">
     <el-space wrap>
       <el-input
         v-model="searchKey"
         placeholder="输入歌曲名/歌手名"
-        style="width: 360px"
+        class="dialog-search-input"
         clearable
         @keyup.enter="search"
       />
@@ -193,5 +193,34 @@ const playNextSong = async (songId: number) => {
   font-size: 12px;
   padding-left: 8px;
   padding-right: 8px;
+}
+
+.dialog-search-input {
+  width: 360px;
+  max-width: 100%;
+}
+
+@media (max-width: 960px) {
+  .page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .page-head :deep(.el-space) {
+    width: 100%;
+  }
+
+  .page-head :deep(.el-space .el-button) {
+    margin-left: 0;
+  }
+
+  .page-head :deep(.el-space__item) {
+    width: 100%;
+  }
+
+  .page-head :deep(.el-space__item .el-button) {
+    width: 100%;
+  }
 }
 </style>

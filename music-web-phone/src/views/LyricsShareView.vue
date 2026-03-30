@@ -48,7 +48,7 @@ const submit = async () => {
       <el-col :span="12"><el-input v-model="form.bgColor" placeholder="背景色，例如 #ffffff" /></el-col>
       <el-col :span="12"><el-input v-model="form.textColor" placeholder="文字色，例如 #333333" /></el-col>
     </el-row>
-    <el-button type="primary" style="margin-top: 8px" @click="submit">创建分享</el-button>
+    <el-button class="share-submit-btn" type="primary" style="margin-top: 8px" @click="submit">创建分享</el-button>
   </el-card>
 
   <el-card class="glow-card" style="margin-top: 16px">
@@ -62,3 +62,11 @@ const submit = async () => {
     </StateBlock>
   </el-card>
 </template>
+
+<style scoped>
+@media (max-width: 960px) {
+  .share-submit-btn {
+    width: 100%;
+  }
+}
+</style>

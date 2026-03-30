@@ -166,37 +166,43 @@ const playMood = async () => {
 .discover {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 .hero {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  padding: 24px;
-  border-radius: 16px;
-  background: linear-gradient(120deg, rgba(120, 118, 255, 0.2), rgba(94, 234, 212, 0.2));
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 12px;
+  padding: 16px;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 0% -60%, rgba(10, 132, 255, 0.16), transparent 58%),
+    radial-gradient(circle at 100% -80%, rgba(250, 45, 72, 0.14), transparent 54%),
+    rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  box-shadow: 0 12px 26px rgba(17, 17, 17, 0.08);
 }
 
 .hero-tag {
-  font-size: 12px;
-  letter-spacing: 0.12em;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #7d7cf6;
-  margin-bottom: 8px;
-}
-
-.hero-title {
-  font-size: 24px;
-  font-weight: 600;
+  color: #8e8e93;
   margin: 0 0 6px;
 }
 
-.hero-sub {
+.hero-title {
+  font-size: 22px;
+  font-weight: 700;
   margin: 0;
-  color: rgba(255, 255, 255, 0.75);
+  color: #1d1d1f;
+}
+
+.hero-sub {
+  margin: 8px 0 0;
+  color: #6e6e73;
+  font-size: 13px;
 }
 
 .hero-actions {
@@ -214,40 +220,47 @@ const playMood = async () => {
 
 .section-title h3 {
   margin: 0 0 4px;
-  font-size: 20px;
+  font-size: 18px;
+  color: #1d1d1f;
 }
 
 .section-title p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.6);
+  color: #6e6e73;
+  font-size: 12px;
 }
 
 .mood-section,
 .mode-section {
-  background: rgba(20, 20, 20, 0.5);
-  border-radius: 16px;
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 10px 22px rgba(17, 17, 17, 0.06);
 }
 
 .mood-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
+  gap: 12px;
+  padding: 12px;
   border-radius: 14px;
-  background: rgba(30, 30, 30, 0.8);
-  margin-bottom: 16px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(245, 245, 247, 0.9);
+  margin-bottom: 12px;
 }
 
 .mood-card h4 {
-  margin: 0 0 6px;
-  font-size: 18px;
+  margin: 0 0 4px;
+  font-size: 16px;
+  color: #1d1d1f;
 }
 
 .mood-card p {
   margin: 0;
-  color: rgba(255, 255, 255, 0.65);
+  color: #6e6e73;
+  font-size: 12px;
 }
 
 .mood-actions {
@@ -257,60 +270,70 @@ const playMood = async () => {
 
 .song-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
 
 .song-chip {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 12px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(255, 255, 255, 0.04);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.96);
   color: inherit;
   cursor: pointer;
+  text-align: left;
 }
 
 .song-chip:hover {
-  border-color: rgba(125, 124, 246, 0.6);
+  border-color: rgba(10, 132, 255, 0.4);
+  box-shadow: 0 8px 16px rgba(10, 132, 255, 0.14);
 }
 
 .song-name {
-  font-weight: 500;
+  font-weight: 600;
+  color: #1d1d1f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 
 .song-meta {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #8e8e93;
 }
 
 .card-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 12px;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 .song-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 12px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(245, 245, 247, 0.9);
+  border: 1px solid rgba(17, 17, 17, 0.08);
 }
 
 .card-title {
-  margin: 0 0 4px;
-  font-weight: 500;
+  margin: 0 0 2px;
+  font-weight: 600;
+  color: #1d1d1f;
 }
 
 .card-sub {
   margin: 0;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #8e8e93;
 }
 
 @media (max-width: 960px) {
@@ -319,15 +342,42 @@ const playMood = async () => {
     align-items: flex-start;
   }
 
+  .hero-actions {
+    width: 100%;
+  }
+
+  .hero-actions :deep(.el-button) {
+    flex: 1;
+    min-width: 0;
+  }
+
   .section-title {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .section-title :deep(.el-radio-group),
+  .section-title :deep(.el-segmented) {
+    width: 100%;
   }
 
   .mood-card {
     flex-direction: column;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .mood-actions {
+    width: 100%;
+  }
+
+  .mood-actions :deep(.el-button) {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .song-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

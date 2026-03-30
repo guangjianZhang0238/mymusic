@@ -51,3 +51,11 @@ const getAvatar = (artist: any) => normalizeImageUrl(artist?.avatar)
     </el-card>
   </StateBlock>
 </template>
+
+<style scoped>
+@media (max-width: 960px) {
+  .el-card :deep(.el-button) {
+    width: 100%;
+  }
+}
+</style>

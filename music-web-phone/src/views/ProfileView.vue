@@ -54,7 +54,7 @@ const play = async (songId: number) => {
 <template>
   <h2 class="page-title">个人中心</h2>
   <el-row :gutter="16">
-    <el-col :span="8">
+    <el-col :xs="24" :md="8">
       <el-card class="glow-card">
         <template #header>账号信息</template>
         <p><strong>用户名：</strong>{{ user.userInfo?.username || '-' }}</p>
@@ -63,7 +63,7 @@ const play = async (songId: number) => {
         <input type="file" accept="image/*" @change="uploadAvatar" />
       </el-card>
     </el-col>
-    <el-col :span="16">
+    <el-col :xs="24" :md="16">
       <el-card class="glow-card">
         <template #header>我的收藏（{{ favorites.length }}）</template>
         <StateBlock :loading="loading" :error="error" :empty="!favorites.length" empty-text="暂无收藏歌曲">
@@ -85,3 +85,11 @@ const play = async (songId: number) => {
     </el-col>
   </el-row>
 </template>
+
+<style scoped>
+@media (max-width: 960px) {
+  .el-row {
+    row-gap: 10px;
+  }
+}
+</style>

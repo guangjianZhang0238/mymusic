@@ -64,4 +64,15 @@ const submit = async () => {
 .login-card {
   width: 360px;
 }
+
+@media (max-width: 960px) {
+  .login-wrap {
+    min-height: calc(100dvh - env(safe-area-inset-bottom));
+    padding: 12px;
+  }
+
+  .login-card {
+    width: min(96vw, 420px);
+  }
+}
 </style>
